@@ -164,7 +164,10 @@ function formatTime($seconds)
                         </thead>
                         <tbody>
                             <?php foreach ($songs as $index => $song): ?>
-                                <tr class="song-row hover:bg-white hover:bg-opacity-10 border-b border-gray-700" data-song-id="<?= $song['song_id'] ?>" data-file="<?= htmlspecialchars($song['file_path']) ?>">
+                                <tr class="song-row hover:bg-white hover:bg-opacity-10 border-b border-gray-700" 
+                                    data-song-id="<?= $song['song_id'] ?>" 
+                                    data-file="<?= htmlspecialchars($song['file_path']) ?>"
+                                    data-album-cover="<?= !empty($song['cover_art']) ? htmlspecialchars($song['cover_art']) : 'uploads/covers/hollywood.jpg' ?>">
                                     <td class="py-2 md:py-3 px-1 md:px-2">
                                         <div class="flex items-center">
                                             <button class="play-button bg-transparent border-0 text-white cursor-pointer text-sm flex items-center justify-center w-4 mr-2 md:mr-4">
@@ -209,7 +212,7 @@ function formatTime($seconds)
             <!-- Left section - Song info (smaller width) -->
             <div class="flex items-center w-full md:w-1/4">
                 <div class="w-12 h-12 md:w-14 md:h-14 mr-3 md:mr-4 flex-shrink-0">
-                    <img id="current-cover" src="uploads/covers/default_cover.jpg" alt="Now playing" class="w-full h-full object-cover">
+                    <img id="current-cover" src="uploads/covers/hollywood.jpg" alt="Now playing" class="w-full h-full object-cover">
                 </div>
                 <div class="flex flex-col truncate">
                     <div id="current-title" class="text-white text-xs md:text-sm font-medium mb-1 truncate">No song selected</div>

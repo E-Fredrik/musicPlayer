@@ -198,10 +198,37 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             if (mysqli_query($conn, $insert_album_sql)) {
                                 $album_id = mysqli_insert_id($conn);
 
-                                // Link album to artist
+                                // Link album to primary artist using prepared statements
                                 if ($artist_id) {
-                                    $link_album_sql = "INSERT INTO album_artists (album_id, artist_id, is_primary) VALUES ($album_id, $artist_id, 1)";
-                                    mysqli_query($conn, $link_album_sql);
+                                    $link_album_sql = "INSERT INTO album_artists (album_id, artist_id, is_primary) VALUES (?, ?, ?)";
+                                    $album_artist_stmt = mysqli_prepare($conn, $link_album_sql);
+                                    
+                                    if ($album_artist_stmt) {
+                                        $is_primary = 1; // This is the primary artist
+                                        mysqli_stmt_bind_param($album_artist_stmt, "iii", $album_id, $artist_id, $is_primary);
+                                        
+                                        if (!mysqli_stmt_execute($album_artist_stmt)) {
+                                            $error .= " Failed to link album to artist: " . mysqli_stmt_error($album_artist_stmt);
+                                        }
+                                        mysqli_stmt_close($album_artist_stmt);
+                                        
+                                        // Also link additional artists to album if applicable
+                                        if (isset($_POST['additional_artists']) && is_array($_POST['additional_artists'])) {
+                                            foreach ($_POST['additional_artists'] as $add_artist_id) {
+                                                if ($add_artist_id != $artist_id && !empty($add_artist_id)) {
+                                                    $add_album_artist_sql = "INSERT INTO album_artists (album_id, artist_id, is_primary) VALUES (?, ?, ?)";
+                                                    $add_album_artist_stmt = mysqli_prepare($conn, $add_album_artist_sql);
+                                                    
+                                                    if ($add_album_artist_stmt) {
+                                                        $is_secondary = 0; // This is a featured artist
+                                                        mysqli_stmt_bind_param($add_album_artist_stmt, "iii", $album_id, $add_artist_id, $is_secondary);
+                                                        mysqli_stmt_execute($add_album_artist_stmt);
+                                                        mysqli_stmt_close($add_album_artist_stmt);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             } else {
                                 $error = "Error creating new album: " . mysqli_error($conn);
@@ -215,28 +242,73 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         // Insert song into database
                         $release_date = isset($_POST['release_date']) ? mysqli_real_escape_string($conn, $_POST['release_date']) : NULL;
 
+                        // Prepare statement to prevent SQL injection
                         $sql = "INSERT INTO songs (title, duration, file_path, cover_art, album_id, release_date) 
-                                VALUES ('$title', $duration, '$songTargetFile', " .
-                            ($coverPath ? "'$coverPath'" : "NULL") . ", " .
-                            ($album_id ? "$album_id" : "NULL") . ", " .
-                            ($release_date ? "'$release_date'" : "NULL") . ")";
+                                VALUES (?, ?, ?, ?, ?, ?)";
 
-                        if (mysqli_query($conn, $sql)) {
+                        // Use prepared statements instead
+                        $stmt = mysqli_prepare($conn, $sql);
+
+                        // Initialize variables properly to ensure they can be passed by reference
+                        // NULL in PHP can't be directly passed by reference
+                        $cover_path_param = $coverPath;
+                        $album_id_param = $album_id;
+                        $release_date_param = $release_date;
+
+                        // Check for NULL values and convert them to empty strings for binding
+                        // This is important because NULL can't be passed by reference
+                        if ($cover_path_param === NULL) $cover_path_param = '';
+                        if ($album_id_param === NULL) $album_id_param = 0;  // Use 0 instead of NULL for integers
+                        if ($release_date_param === NULL) $release_date_param = '';
+
+                        // Bind parameters - now all are properly initialized variables
+                        mysqli_stmt_bind_param($stmt, "sissss",  // Changed the last 'i' to 's' to accept empty values
+                            $title, 
+                            $duration, 
+                            $songTargetFile, 
+                            $cover_path_param, 
+                            $album_id_param, 
+                            $release_date_param
+                        );
+
+                        // After execution, put the NULL values back in MySQL with a direct SQL UPDATE if needed
+                        if (mysqli_stmt_execute($stmt)) {
                             $song_id = mysqli_insert_id($conn);
-
+                            
+                            // If album_id was null, update it to NULL in the database
+                            if ($album_id === NULL) {
+                                mysqli_query($conn, "UPDATE songs SET album_id = NULL WHERE song_id = $song_id");
+                            }
+                            
                             // Link song to artist
                             if ($artist_id) {
                                 $link_sql = "INSERT INTO song_artists (song_id, artist_id, is_primary) 
-                                            VALUES ($song_id, $artist_id, 1)";
-                                mysqli_query($conn, $link_sql);
+                                            VALUES (?, ?, ?)";
+                                $link_stmt = mysqli_prepare($conn, $link_sql);
+                                
+                                if (!$link_stmt) {
+                                    $error .= " Failed to prepare song-artist link: " . mysqli_error($conn);
+                                } else {
+                                    mysqli_stmt_bind_param($link_stmt, "iii", $song_id, $artist_id, 1);
+                                    if (!mysqli_stmt_execute($link_stmt)) {
+                                        $error .= " Failed to link song to main artist: " . mysqli_stmt_error($link_stmt);
+                                    }
+                                    mysqli_stmt_close($link_stmt);
+                                }
 
-                                // Process additional artists if any
+                                // Process additional artists with better error handling
                                 if (isset($_POST['additional_artists']) && is_array($_POST['additional_artists'])) {
                                     foreach ($_POST['additional_artists'] as $add_artist_id) {
-                                        if ($add_artist_id != $artist_id) { // Don't duplicate the main artist
-                                            $link_sql = "INSERT INTO song_artists (song_id, artist_id, is_primary) 
-                                                        VALUES ($song_id, $add_artist_id, 0)";
-                                            mysqli_query($conn, $link_sql);
+                                        if ($add_artist_id != $artist_id && !empty($add_artist_id)) { // Don't duplicate the main artist
+                                            $additional_link_sql = "INSERT INTO song_artists (song_id, artist_id, is_primary) 
+                                      VALUES (?, ?, ?)";
+                                            $additional_stmt = mysqli_prepare($conn, $additional_link_sql);
+                                            
+                                            if ($additional_stmt) {
+                                                mysqli_stmt_bind_param($additional_stmt, "iii", $song_id, $add_artist_id, 0);
+                                                mysqli_stmt_execute($additional_stmt);
+                                                mysqli_stmt_close($additional_stmt);
+                                            }
                                         }
                                     }
                                 }
@@ -246,14 +318,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         } else {
                             $error = "Error: " . mysqli_error($conn);
                         }
+
+                        // Close the prepared statement
+                        mysqli_stmt_close($stmt);
                     }
                 }
             } else {
                 $error = "Sorry, there was an error uploading your song file.";
             }
-        }
+        } 
     } else {
-        $error = "Please select a song file to upload.";
+            $error = "Please select a song file to upload.";
     }
 }
 
@@ -293,6 +368,19 @@ function formatTime($seconds)
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="home.css">
     <style>
+        /* Ensure text inputs allow all characters including spaces */
+        input[type="text"],
+        textarea {
+            white-space: pre-wrap !important;
+            word-spacing: normal !important;
+        }
+
+        /* Remove any potential input restrictions */
+        input[type="text"]:focus,
+        textarea:focus {
+            outline: 2px solid #1db954 !important;
+        }
+
         /* Additional styles to fix the mobile overlap */
         @media (max-width: 768px) {
             .content-area {
@@ -647,7 +735,30 @@ function formatTime($seconds)
     <!-- Keep JavaScript toggle for form sections -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Artist option toggle
+            // Remove any conflicting event listeners and ensure spaces work
+            const textInputs = document.querySelectorAll('input[type="text"], textarea');
+            textInputs.forEach(input => {
+                // Remove any restrictive attributes
+                input.removeAttribute('pattern');
+                input.removeAttribute('maxlength');
+                
+                // Ensure no conflicting event listeners
+                input.addEventListener('keydown', function(e) {
+                    // Explicitly allow space (keyCode 32)
+                    if (e.keyCode === 32 || e.key === ' ') {
+                        e.stopPropagation();
+                        return true;
+                    }
+                });
+                
+                // Prevent any trimming on input
+                input.addEventListener('input', function(e) {
+                    // Don't modify the value - let spaces through
+                    console.log('Input value:', this.value);
+                });
+            });
+            
+            // Your existing form toggle code remains the same...
             const existingArtistRadio = document.getElementById('existing_artist');
             const newArtistRadio = document.getElementById('new_artist');
             const existingArtistSection = document.getElementById('existing_artist_section');
@@ -657,8 +768,6 @@ function formatTime($seconds)
                 if (this.checked) {
                     existingArtistSection.style.display = 'block';
                     newArtistSection.style.display = 'none';
-
-                    // Make existing artist field required
                     document.getElementById('artist_id').required = true;
                     document.getElementById('new_artist_name').required = false;
                 }
@@ -668,14 +777,12 @@ function formatTime($seconds)
                 if (this.checked) {
                     existingArtistSection.style.display = 'none';
                     newArtistSection.style.display = 'block';
-
-                    // Make new artist field required
                     document.getElementById('artist_id').required = false;
                     document.getElementById('new_artist_name').required = true;
                 }
             });
 
-            // Album option toggle
+            // Album toggle code...
             const noAlbumRadio = document.getElementById('no_album');
             const existingAlbumRadio = document.getElementById('existing_album');
             const newAlbumRadio = document.getElementById('new_album');
@@ -686,8 +793,6 @@ function formatTime($seconds)
                 if (this.checked) {
                     existingAlbumSection.style.display = 'none';
                     newAlbumSection.style.display = 'none';
-
-                    // Make album fields not required
                     document.getElementById('album_id').required = false;
                     document.getElementById('new_album_title').required = false;
                 }
@@ -697,8 +802,6 @@ function formatTime($seconds)
                 if (this.checked) {
                     existingAlbumSection.style.display = 'block';
                     newAlbumSection.style.display = 'none';
-
-                    // Make existing album field required
                     document.getElementById('album_id').required = true;
                     document.getElementById('new_album_title').required = false;
                 }
@@ -708,11 +811,30 @@ function formatTime($seconds)
                 if (this.checked) {
                     existingAlbumSection.style.display = 'none';
                     newAlbumSection.style.display = 'block';
-
-                    // Make new album field required
                     document.getElementById('album_id').required = false;
                     document.getElementById('new_album_title').required = true;
                 }
+            });
+
+            // File input handlers remain the same...
+            document.getElementById('song_file').addEventListener('change', function() {
+                const fileName = this.files[0] ? this.files[0].name : 'No file selected';
+                document.getElementById('song_file_name').textContent = fileName;
+            });
+
+            document.getElementById('cover_art').addEventListener('change', function() {
+                const fileName = this.files[0] ? this.files[0].name : 'No file selected';
+                document.getElementById('cover_art_name').textContent = fileName;
+            });
+
+            document.getElementById('new_artist_image').addEventListener('change', function() {
+                const fileName = this.files[0] ? this.files[0].name : 'No file selected';
+                document.getElementById('new_artist_image_name').textContent = fileName;
+            });
+
+            document.getElementById('new_album_cover').addEventListener('change', function() {
+                const fileName = this.files[0] ? this.files[0].name : 'No file selected';
+                document.getElementById('new_album_cover_name').textContent = fileName;
             });
         });
     </script>
