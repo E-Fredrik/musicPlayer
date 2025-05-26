@@ -69,160 +69,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register - MusicStream</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(to bottom right, #333333, #121212);
-            color: #ffffff;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        .register-container {
-            width: 100%;
-            max-width: 450px;
-            padding: 40px;
-            background-color: #181818;
-            border-radius: 8px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-        }
-        .register-header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .register-header h1 {
-            color: #1DB954;
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-        .register-header p {
-            color: #b3b3b3;
-            font-size: 16px;
-        }
-        .error-message {
-            background-color: rgba(255, 0, 0, 0.1);
-            color: #ff4a4a;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            font-size: 14px;
-            text-align: center;
-        }
-        .success-message {
-            background-color: rgba(29, 185, 84, 0.1);
-            color: #1DB954;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            font-size: 14px;
-            text-align: center;
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #b3b3b3;
-            font-size: 14px;
-        }
-        .form-group input {
-            width: 100%;
-            padding: 12px;
-            background-color: #333333;
-            border: none;
-            border-radius: 4px;
-            color: #ffffff;
-            font-size: 16px;
-            transition: background-color 0.3s;
-        }
-        .form-group input:focus {
-            outline: none;
-            background-color: #404040;
-        }
-        .button {
-            width: 100%;
-            padding: 14px;
-            background-color: #1DB954;
-            color: white;
-            border: none;
-            border-radius: 30px;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        .button:hover {
-            background-color: #1ed760;
-        }
-        .register-footer {
-            margin-top: 30px;
-            text-align: center;
-            color: #b3b3b3;
-            font-size: 14px;
-        }
-        .register-footer a {
-            color: #ffffff;
-            text-decoration: none;
-            font-weight: 600;
-        }
-        .register-footer a:hover {
-            text-decoration: underline;
-        }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body>
-    <div class="register-container">
-        <div class="register-header">
-            <h1>MusicStream</h1>
-            <p>Sign up for free music streaming</p>
+<body class="font-sans bg-gradient-to-br from-gray-700 to-gray-900 text-white min-h-screen flex items-center justify-center p-5">
+    <div class="w-full max-w-md p-10 bg-gray-800 rounded-lg shadow-xl">
+        <div class="text-center mb-8">
+            <h1 class="text-green-500 text-3xl font-bold mb-2">MusicStream</h1>
+            <p class="text-gray-400 text-base">Sign up for free music streaming</p>
         </div>
         
         <?php if (!empty($error)): ?>
-            <div class="error-message">
+            <div class="bg-red-500 bg-opacity-10 text-red-500 p-3 rounded mb-5 text-sm text-center">
                 <?php echo $error; ?>
             </div>
         <?php endif; ?>
         
         <?php if (!empty($success)): ?>
-            <div class="success-message">
+            <div class="bg-green-500 bg-opacity-10 text-green-500 p-3 rounded mb-5 text-sm text-center">
                 <?php echo $success; ?>
             </div>
         <?php endif; ?>
         
         <form method="POST" action="register.php">
-            <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" required>
+            <div class="mb-5">
+                <label for="username" class="block mb-2 text-gray-400 text-sm font-medium">Username</label>
+                <input type="text" id="username" name="username" required 
+                       class="w-full p-3 bg-gray-700 border-none rounded text-white text-base focus:outline-none focus:bg-gray-600">
             </div>
             
-            <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email" required>
+            <div class="mb-5">
+                <label for="email" class="block mb-2 text-gray-400 text-sm font-medium">Email</label>
+                <input type="email" id="email" name="email" required 
+                       class="w-full p-3 bg-gray-700 border-none rounded text-white text-base focus:outline-none focus:bg-gray-600">
             </div>
             
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" required>
+            <div class="mb-5">
+                <label for="password" class="block mb-2 text-gray-400 text-sm font-medium">Password</label>
+                <input type="password" id="password" name="password" required 
+                       class="w-full p-3 bg-gray-700 border-none rounded text-white text-base focus:outline-none focus:bg-gray-600">
             </div>
             
-            <div class="form-group">
-                <label for="confirm_password">Confirm Password</label>
-                <input type="password" id="confirm_password" name="confirm_password" required>
+            <div class="mb-5">
+                <label for="confirm_password" class="block mb-2 text-gray-400 text-sm font-medium">Confirm Password</label>
+                <input type="password" id="confirm_password" name="confirm_password" required 
+                       class="w-full p-3 bg-gray-700 border-none rounded text-white text-base focus:outline-none focus:bg-gray-600">
             </div>
             
-            <button type="submit" class="button">SIGN UP</button>
+            <button type="submit" 
+                    class="w-full py-3.5 px-4 bg-green-500 text-white border-0 rounded-full text-base font-bold cursor-pointer transition-colors hover:bg-green-400">
+                SIGN UP
+            </button>
         </form>
         
-        <div class="register-footer">
-            <p>Already have an account? <a href="login.php">Log in</a></p>
+        <div class="mt-7 text-center text-gray-400 text-sm">
+            <p>Already have an account? <a href="login.php" class="text-white no-underline font-semibold hover:underline">Log in</a></p>
         </div>
     </div>
 </body>

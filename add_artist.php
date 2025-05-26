@@ -7,6 +7,19 @@ include 'sqlConnect.php';
 // Check if user is logged in
 $logged_in = isset($_SESSION['user_id']);
 
+// Profile picture logic
+$profile_picture = 'uploads/profiles/default_profile.jpg'; // Default profile picture
+if ($logged_in) {
+    $profile_query = "SELECT profile_picture FROM users WHERE user_id = " . $_SESSION['user_id'];
+    $profile_result = mysqli_query($conn, $profile_query);
+    if ($profile_result && mysqli_num_rows($profile_result) > 0) {
+        $profile_data = mysqli_fetch_assoc($profile_result);
+        if (!empty($profile_data['profile_picture'])) {
+            $profile_picture = $profile_data['profile_picture'];
+        }
+    }
+}
+
 // Redirect to login if not logged in
 if (!$logged_in) {
     header('Location: login.php');
@@ -127,17 +140,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                 <?php if ($logged_in): ?>
                     <li class="py-2 px-6">
-                        <a href="#" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
+                        <a href="library.php" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
                             <i class="fas fa-book mr-4 text-xl"></i> Your Library
                         </a>
                     </li>
                     <li class="py-2 px-6">
-                        <a href="#" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
+                        <a href="addPlaylist.php" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
                             <i class="fas fa-plus-square mr-4 text-xl"></i> Create Playlist
                         </a>
                     </li>
                     <li class="py-2 px-6">
-                        <a href="#" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
+                        <a href="liked_songs.php" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
                             <i class="fas fa-heart mr-4 text-xl"></i> Liked Songs
                         </a>
                     </li>
@@ -152,8 +165,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         </a>
                     </li>
                     <li class="mt-5 pt-5 border-t border-gray-700 py-2 px-6">
-                        <a href="#" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
-                            <i class="fas fa-user mr-4 text-xl"></i>
+                        <a href="profile.php" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
+                            <div class="w-8 h-8 rounded-full overflow-hidden mr-4 flex-shrink-0">
+                                <img src="<?= $profile_picture ?>" alt="Profile" class="w-full h-full object-cover">
+                            </div>
                             <?php echo htmlspecialchars($_SESSION['username']); ?>
                         </a>
                     </li>
@@ -289,6 +304,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     <!-- Include the external player script -->
     <script src="player.js"></script>
+    <script src="playerState.js"></script>
     
     <!-- Display file name when selected -->
     <script>

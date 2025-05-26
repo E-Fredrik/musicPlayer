@@ -39,6 +39,19 @@ function formatTime($seconds)
 {
     return sprintf("%02d:%02d", floor($seconds / 60), $seconds % 60);
 }
+
+// Profile picture logic
+$profile_picture = 'uploads/profiles/default_profile.jpg'; // Default profile picture
+if ($logged_in) {
+    $profile_query = "SELECT profile_picture FROM users WHERE user_id = " . $_SESSION['user_id'];
+    $profile_result = mysqli_query($conn, $profile_query);
+    if ($profile_result && mysqli_num_rows($profile_result) > 0) {
+        $profile_data = mysqli_fetch_assoc($profile_result);
+        if (!empty($profile_data['profile_picture'])) {
+            $profile_picture = $profile_data['profile_picture'];
+        }
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -88,24 +101,24 @@ function formatTime($seconds)
                     </a>
                 </li>
                 <li class="py-2 px-6">
-                    <a href="#" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
+                    <a href="search.php" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
                         <i class="fas fa-search mr-4 text-xl"></i> Search
                     </a>
                 </li>
 
                 <?php if ($logged_in): ?>
                     <li class="py-2 px-6">
-                        <a href="#" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
+                        <a href="library.php" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
                             <i class="fas fa-book mr-4 text-xl"></i> Your Library
                         </a>
                     </li>
                     <li class="py-2 px-6">
-                        <a href="#" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
+                        <a href="addPlaylist.php" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
                             <i class="fas fa-plus-square mr-4 text-xl"></i> Create Playlist
                         </a>
                     </li>
                     <li class="py-2 px-6">
-                        <a href="#" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
+                        <a href="liked_songs.php" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
                             <i class="fas fa-heart mr-4 text-xl"></i> Liked Songs
                         </a>
                     </li>
@@ -120,8 +133,10 @@ function formatTime($seconds)
                         </a>
                     </li>
                     <li class="mt-5 pt-5 border-t border-gray-700 py-2 px-6">
-                        <a href="#" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
-                            <i class="fas fa-user mr-4 text-xl"></i>
+                        <a href="profile.php" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
+                            <div class="w-8 h-8 rounded-full overflow-hidden mr-4 flex-shrink-0">
+                                <img src="<?= $profile_picture ?>" alt="Profile" class="w-full h-full object-cover">
+                            </div>
                             <?php echo htmlspecialchars($_SESSION['username']); ?>
                         </a>
                     </li>
@@ -167,7 +182,7 @@ function formatTime($seconds)
                                 <tr class="song-row hover:bg-white hover:bg-opacity-10 border-b border-gray-700" 
                                     data-song-id="<?= $song['song_id'] ?>" 
                                     data-file="<?= htmlspecialchars($song['file_path']) ?>"
-                                    data-album-cover="<?= !empty($song['cover_art']) ? htmlspecialchars($song['cover_art']) : 'uploads/covers/hollywood.jpg' ?>">
+                                    data-album-cover="<?= !empty($song['cover_art']) ? htmlspecialchars($song['cover_art']) : 'uploads/covers/default_cover.jpg' ?>">
                                     <td class="py-2 md:py-3 px-1 md:px-2">
                                         <div class="flex items-center">
                                             <button class="play-button bg-transparent border-0 text-white cursor-pointer text-sm flex items-center justify-center w-4 mr-2 md:mr-4">
@@ -179,7 +194,8 @@ function formatTime($seconds)
                                     <td class="py-2 md:py-3 px-1 md:px-2">
                                         <div class="flex items-center">
                                             <div class="w-8 h-8 md:w-10 md:h-10 mr-2 md:mr-4 flex-shrink-0">
-                                                <img src="<?= !empty($song['cover_art']) ? $song['cover_art'] : 'uploads/covers/default_cover.jpg' ?>" alt="Cover" class="w-full h-full object-cover">
+                                                <img src="<?= !empty($song['cover_art']) ? $song['cover_art'] : 'uploads/covers/default_cover.jpg' ?>" 
+                                                    alt="Cover" class="w-full h-full object-cover">
                                             </div>
                                             <div class="flex flex-col">
                                                 <div class="song-title text-white text-sm md:text-base truncate max-w-[150px] md:max-w-none"><?= htmlspecialchars($song['song_title']) ?></div>
@@ -196,7 +212,23 @@ function formatTime($seconds)
                                             -
                                         <?php endif; ?>
                                     </td>
-                                    <td class="py-2 md:py-3 px-1 md:px-2 text-gray-400 text-xs md:text-sm"><?= formatTime($song['duration']) ?></td>
+                                    <td class="py-2 md:py-3 px-1 md:px-2 text-gray-400 text-xs md:text-sm">
+                                        <?= formatTime($song['duration']) ?>
+                                    </td>
+                                    <td class="py-2 md:py-3 px-1 md:px-2 text-right">
+                                        <?php
+                                        // Check if song is liked by current user
+                                        $is_liked = false;
+                                        if ($logged_in) {
+                                            $like_check = mysqli_query($conn, "SELECT * FROM liked_songs WHERE user_id = " . $_SESSION['user_id'] . " AND song_id = " . $song['song_id']);
+                                            $is_liked = ($like_check && mysqli_num_rows($like_check) > 0);
+                                        }
+                                        ?>
+                                        <button class="like-button text-gray-400 hover:text-white bg-transparent border-0 cursor-pointer" 
+                                                data-song-id="<?= $song['song_id'] ?>">
+                                            <i class="<?= $is_liked ? 'fas' : 'far' ?> fa-heart <?= $is_liked ? 'text-green-500' : '' ?>"></i>
+                                        </button>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -268,6 +300,7 @@ function formatTime($seconds)
 
     <!-- Include the external player script -->
     <script src="player.js"></script>
+    <script src="playerState.js"></script>
     
     <!-- Mobile menu script -->
     <script>
@@ -284,6 +317,43 @@ function formatTime($seconds)
             overlay.addEventListener('click', function() {
                 sidebar.classList.remove('open');
                 overlay.classList.remove('open');
+            });
+            
+            // Add like/unlike functionality
+            const likeButtons = document.querySelectorAll('.like-button');
+            likeButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.stopPropagation(); // Prevent row click
+                    const songId = this.dataset.songId;
+                    const heartIcon = this.querySelector('i');
+                    const isLiked = heartIcon.classList.contains('fas');
+                    
+                    // Determine action based on current state
+                    const action = isLiked ? 'unlike' : 'like';
+                    
+                    // AJAX request to like/unlike the song
+                    fetch('like_song.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: 'song_id=' + songId + '&action=' + action
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update heart icon
+                            if (action === 'like') {
+                                heartIcon.classList.replace('far', 'fas');
+                                heartIcon.classList.add('text-green-500');
+                            } else {
+                                heartIcon.classList.replace('fas', 'far');
+                                heartIcon.classList.remove('text-green-500');
+                            }
+                        }
+                    })
+                    .catch(error => console.error('Error:', error));
+                });
             });
         });
     </script>

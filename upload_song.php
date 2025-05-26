@@ -13,6 +13,19 @@ if (!$logged_in) {
     exit();
 }
 
+// Profile picture logic
+$profile_picture = 'uploads/profiles/default_profile.jpg'; // Default profile picture
+if ($logged_in) {
+    $profile_query = "SELECT profile_picture FROM users WHERE user_id = " . $_SESSION['user_id'];
+    $profile_result = mysqli_query($conn, $profile_query);
+    if ($profile_result && mysqli_num_rows($profile_result) > 0) {
+        $profile_data = mysqli_fetch_assoc($profile_result);
+        if (!empty($profile_data['profile_picture'])) {
+            $profile_picture = $profile_data['profile_picture'];
+        }
+    }
+}
+
 $message = '';
 $error = '';
 
@@ -59,7 +72,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     // Process song file upload first to get duration
     $targetDir = "uploads/songs/";
-    $duration = 0;
+    $duration = isset($_POST['detected_duration']) && is_numeric($_POST['detected_duration']) ? 
+        (int)$_POST['detected_duration'] : 0;
     $songTargetFile = "";
 
     // Create directory if it doesn't exist
@@ -81,8 +95,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         } else {
             // Upload file
             if (move_uploaded_file($_FILES["song_file"]["tmp_name"], $songTargetFile)) {
-                // Get the duration automatically
-                $duration = getAudioDuration($songTargetFile);
+                // Use client-side detected duration if available, otherwise try server detection
+                if (isset($_POST['detected_duration']) && is_numeric($_POST['detected_duration']) && (int)$_POST['detected_duration'] > 0) {
+                    $duration = (int)$_POST['detected_duration'];
+                } else {
+                    // Only fall back to server-side detection if client-side failed
+                    $duration = getAudioDuration($songTargetFile);
+                }
 
                 // Process cover image if uploaded
                 $coverPath = NULL;
@@ -282,39 +301,60 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             
                             // Link song to artist
                             if ($artist_id) {
-                                $link_sql = "INSERT INTO song_artists (song_id, artist_id, is_primary) 
-                                            VALUES (?, ?, ?)";
+                                // Insert primary artist relationship
+                                $link_sql = "INSERT INTO song_artists (song_id, artist_id, is_primary) VALUES (?, ?, ?)";
                                 $link_stmt = mysqli_prepare($conn, $link_sql);
                                 
                                 if (!$link_stmt) {
-                                    $error .= " Failed to prepare song-artist link: " . mysqli_error($conn);
+                                    $error = "Failed to prepare song-artist link: " . mysqli_error($conn);
                                 } else {
-                                    mysqli_stmt_bind_param($link_stmt, "iii", $song_id, $artist_id, 1);
+                                    $is_primary = 1; // Set primary artist flag
+                                    mysqli_stmt_bind_param($link_stmt, "iii", $song_id, $artist_id, $is_primary);
+                                    
                                     if (!mysqli_stmt_execute($link_stmt)) {
-                                        $error .= " Failed to link song to main artist: " . mysqli_stmt_error($link_stmt);
+                                        $error = "Failed to link song to artist: " . mysqli_stmt_error($link_stmt);
+                                    } else {
+                                        // Success! Continue with additional artists
+                                        
+                                        // Process additional artists if any were selected
+                                        if (isset($_POST['additional_artists']) && !empty($_POST['additional_artists']) && is_array($_POST['additional_artists'])) {
+                                            foreach ($_POST['additional_artists'] as $add_artist_id) {
+                                                // Skip if it's the same as primary artist or empty
+                                                if ($add_artist_id != $artist_id && !empty($add_artist_id)) {
+                                                    $add_stmt = mysqli_prepare($conn, $link_sql); // Reuse the same SQL
+                                                    
+                                                    if ($add_stmt) {
+                                                        $not_primary = 0; // Not a primary artist
+                                                        mysqli_stmt_bind_param($add_stmt, "iii", $song_id, $add_artist_id, $not_primary);
+                                                        
+                                                        if (!mysqli_stmt_execute($add_stmt)) {
+                                                            // Log error but continue with other artists
+                                                            $error .= " Warning: Failed to link additional artist: " . mysqli_stmt_error($add_stmt);
+                                                        }
+                                                        mysqli_stmt_close($add_stmt);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Check song_artists table to verify insertion
+                                        $check_query = "SELECT COUNT(*) as count FROM song_artists WHERE song_id = $song_id";
+                                        $check_result = mysqli_query($conn, $check_query);
+                                        $check_data = mysqli_fetch_assoc($check_result);
+                                        
+                                        if ($check_data['count'] == 0) {
+                                            $error .= " Warning: No records found in song_artists table after insertion.";
+                                        } else {
+                                            $message = "Song uploaded successfully! Detected duration: " . formatTime($duration);
+                                            $message .= " Added " . $check_data['count'] . " artist relationship(s).";
+                                        }
                                     }
                                     mysqli_stmt_close($link_stmt);
                                 }
-
-                                // Process additional artists with better error handling
-                                if (isset($_POST['additional_artists']) && is_array($_POST['additional_artists'])) {
-                                    foreach ($_POST['additional_artists'] as $add_artist_id) {
-                                        if ($add_artist_id != $artist_id && !empty($add_artist_id)) { // Don't duplicate the main artist
-                                            $additional_link_sql = "INSERT INTO song_artists (song_id, artist_id, is_primary) 
-                                      VALUES (?, ?, ?)";
-                                            $additional_stmt = mysqli_prepare($conn, $additional_link_sql);
-                                            
-                                            if ($additional_stmt) {
-                                                mysqli_stmt_bind_param($additional_stmt, "iii", $song_id, $add_artist_id, 0);
-                                                mysqli_stmt_execute($additional_stmt);
-                                                mysqli_stmt_close($additional_stmt);
-                                            }
-                                        }
-                                    }
-                                }
+                            } else {
+                                $error = "No artist selected for the song. Song needs at least one artist.";
                             }
 
-                            $message = "Song uploaded successfully! Detected duration: " . formatTime($duration);
                         } else {
                             $error = "Error: " . mysqli_error($conn);
                         }
@@ -424,17 +464,17 @@ function formatTime($seconds)
 
                 <?php if ($logged_in): ?>
                     <li class="py-2 px-6">
-                        <a href="#" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
+                        <a href="library.php" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
                             <i class="fas fa-book mr-4 text-xl"></i> Your Library
                         </a>
                     </li>
                     <li class="py-2 px-6">
-                        <a href="#" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
+                        <a href="addPlaylist.php" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
                             <i class="fas fa-plus-square mr-4 text-xl"></i> Create Playlist
                         </a>
                     </li>
                     <li class="py-2 px-6">
-                        <a href="#" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
+                        <a href="liked_songs.php" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
                             <i class="fas fa-heart mr-4 text-xl"></i> Liked Songs
                         </a>
                     </li>
@@ -449,8 +489,10 @@ function formatTime($seconds)
                         </a>
                     </li>
                     <li class="mt-5 pt-5 border-t border-gray-700 py-2 px-6">
-                        <a href="#" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
-                            <i class="fas fa-user mr-4 text-xl"></i>
+                        <a href="profile.php" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
+                            <div class="w-8 h-8 rounded-full overflow-hidden mr-4 flex-shrink-0">
+                                <img src="<?= $profile_picture ?>" alt="Profile" class="w-full h-full object-cover">
+                            </div>
                             <?php echo htmlspecialchars($_SESSION['username']); ?>
                         </a>
                     </li>
@@ -646,6 +688,10 @@ function formatTime($seconds)
                             </div>
                         </div>
                         <p class="text-xs text-gray-400 mt-1">Allowed formats: MP3, WAV, OGG, FLAC. Song duration will be detected automatically.</p>
+                        <div id="duration_display" class="text-green-400 text-sm mt-2" style="display: none;">
+        Detected duration: <span id="detected_duration">0:00</span>
+        <input type="hidden" name="detected_duration" id="detected_duration_input" value="0">
+    </div>
                     </div>
 
                     <!-- Cover Art input -->
@@ -731,6 +777,7 @@ function formatTime($seconds)
 
     <!-- Include the external player script -->
     <script src="player.js"></script>
+    <script src="playerState.js"></script>
 
     <!-- Keep JavaScript toggle for form sections -->
     <script>
@@ -857,6 +904,101 @@ function formatTime($seconds)
             });
         });
     </script>
+
+    <!-- Update song duration in database if it's different from what we're playing -->
+    <script>
+        audioPlayer.addEventListener('loadedmetadata', function() {
+    const currentSongId = songs[currentSongIndex].id;
+    const actualDuration = Math.round(audioPlayer.duration);
+    
+    // Get displayed duration from the table
+    let displayedDuration = 0;
+    const songRow = document.querySelector(`tr[data-song-id="${currentSongId}"]`);
+    if (songRow) {
+        const durationCell = songRow.querySelector('td:last-child');
+        const durationText = durationCell.textContent;
+        const parts = durationText.split(':');
+        displayedDuration = (parseInt(parts[0]) * 60) + parseInt(parts[1]);
+    }
+    
+    // If more than 3 seconds difference, update the database
+    if (Math.abs(actualDuration - displayedDuration) > 3) {
+        // Update the duration via AJAX
+        fetch('update_duration.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `song_id=${currentSongId}&duration=${actualDuration}`
+        })
+        .then(response => response.json())
+        .then (data => {
+            if (data.success) {
+                // Update the displayed duration in the table
+                if (songRow) {
+                    const durationCell = songRow.querySelector('td:last-child');
+                    durationCell.textContent = formatTime(actualDuration);
+                }
+            }
+        })
+        .catch(error => console.error('Error updating duration:', error));
+    }
+});
+    </script>
+
+    <script>
+// Duration detection using browser's Audio API
+document.addEventListener('DOMContentLoaded', function() {
+    const songFileInput = document.getElementById('song_file');
+    const durationDisplay = document.getElementById('duration_display');
+    const detectedDurationSpan = document.getElementById('detected_duration');
+    const detectedDurationInput = document.getElementById('detected_duration_input');
+    
+    // Function to format time in MM:SS
+    function formatTime(seconds) {
+        seconds = Math.floor(seconds);
+        const minutes = Math.floor(seconds / 60);
+        seconds = seconds % 60;
+        return minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+    }
+    
+    songFileInput.addEventListener('change', function(e) {
+        if (this.files && this.files[0]) {
+            const file = this.files[0];
+            
+            // Create a blob URL for the file
+            const blobURL = URL.createObjectURL(file);
+            
+            // Create an audio element to detect duration
+            const audio = new Audio();
+            
+            // Show loading indicator
+            detectedDurationSpan.textContent = "Detecting...";
+            durationDisplay.style.display = "block";
+            
+            // When metadata is loaded, we can access the duration
+            audio.addEventListener('loadedmetadata', function() {
+                const duration = Math.round(audio.duration);
+                detectedDurationSpan.textContent = formatTime(duration);
+                detectedDurationInput.value = duration;
+                
+                // Revoke the blob URL to free memory
+                URL.revokeObjectURL(blobURL);
+            });
+            
+            // Handle errors
+            audio.addEventListener('error', function() {
+                detectedDurationSpan.textContent = "Could not detect duration";
+                detectedDurationInput.value = 0;
+                URL.revokeObjectURL(blobURL);
+            });
+            
+            // Set the audio source to the blob URL
+            audio.src = blobURL;
+        }
+    });
+});
+</script>
 </body>
 
 </html>

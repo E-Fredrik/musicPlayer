@@ -172,6 +172,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Handle keyboard shortcuts
     document.addEventListener('keydown', function(event) {
+        // Don't capture keyboard events when user is typing in form elements
+        if (event.target.tagName === 'INPUT' || 
+            event.target.tagName === 'TEXTAREA' || 
+            event.target.isContentEditable) {
+            return; // Let the default behavior happen for input elements
+        }
+        
         // Check if spacebar was pressed
         if (event.code === 'Space' || event.keyCode === 32) {
             // Prevent default spacebar behavior (page scrolling)
@@ -190,4 +197,25 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+    
+    // Export current song data for state management
+    window.updateMusicStreamState = function(index) {
+        if (index >= 0 && index < songs.length) {
+            localStorage.setItem('musicstream_current_song', JSON.stringify({
+                id: songs[index].id,
+                title: songs[index].title,
+                artist: songs[index].artist,
+                cover: songs[index].cover
+            }));
+        }
+    };
+    
+    // Call this when playing a song
+    const originalPlaySong = playSong;
+    playSong = function(index) {
+        originalPlaySong(index);
+        if (window.updateMusicStreamState) {
+            window.updateMusicStreamState(index);
+        }
+    };
 });

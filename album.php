@@ -122,17 +122,17 @@ $release_date = !empty($album['release_date']) ? date('F j, Y', strtotime($album
 
                 <?php if ($logged_in): ?>
                     <li class="py-2 px-6">
-                        <a href="#" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
+                        <a href="library.php" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
                             <i class="fas fa-book mr-4 text-xl"></i> Your Library
                         </a>
                     </li>
                     <li class="py-2 px-6">
-                        <a href="#" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
+                        <a href="addPlaylist.php" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
                             <i class="fas fa-plus-square mr-4 text-xl"></i> Create Playlist
                         </a>
                     </li>
                     <li class="py-2 px-6">
-                        <a href="#" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
+                        <a href="liked_songs.php" class="text-gray-400 hover:text-white flex items-center font-semibold no-underline">
                             <i class="fas fa-heart mr-4 text-xl"></i> Liked Songs
                         </a>
                     </li>
@@ -304,8 +304,9 @@ $release_date = !empty($album['release_date']) ? date('F j, Y', strtotime($album
     <!-- Audio Element -->
     <audio id="audio-player"></audio>
 
-    <!-- Include the external player script -->
+    <!-- Include the player scripts -->
     <script src="player.js"></script>
+    <script src="playerState.js"></script>
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
