@@ -96,39 +96,7 @@ function formatDate($dateString) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="home.css">
-    <style>
-        /* Additional styles to fix the mobile overlap */
-        @media (max-width: 768px) {
-            .content-area {
-                padding-top: 3.5rem !important;
-            }
-        }
-        /* Playlist card hover effect */
-        .playlist-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
-        }
-        /* Confirmation modal */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            justify-content: center;
-            align-items: center;
-        }
-        .modal-content {
-            background-color: #282828;
-            border-radius: 8px;
-            width: 90%;
-            max-width: 400px;
-            padding: 24px;
-        }
-    </style>
+    <link rel="stylesheet" href="library.css">
 </head>
 
 <body class="font-sans bg-gray-900 text-white m-0 p-0 has-player">
@@ -232,11 +200,6 @@ function formatDate($dateString) {
                     <div class="ml-4 md:ml-6 flex-1">
                         <h4 class="text-lg md:text-xl font-bold">Liked Songs</h4>
                         <p class="text-sm md:text-base"><?= $liked_songs_count ?> songs</p>
-                    </div>
-                    <div>
-                        <button class="bg-white text-black rounded-full w-10 h-10 flex items-center justify-center hover:scale-105 transition-transform">
-                            <i class="fas fa-play"></i>
-                        </button>
                     </div>
                 </div>
             </div>

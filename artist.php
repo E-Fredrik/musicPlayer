@@ -120,29 +120,7 @@ function formatDate($dateString)
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="home.css">
-    <style>
-        @media (max-width: 768px) {
-            .content-area {
-                padding-top: 3.5rem !important;
-            }
-        }
-        
-        .artist-header {
-            background: linear-gradient(to bottom, rgba(48, 48, 48, 0.8), rgba(18, 18, 18, 1));
-        }
-        
-        .section-divider {
-            width: 100%;
-            height: 1px;
-            background-color: rgba(255, 255, 255, 0.1);
-            margin: 2rem 0;
-        }
-        
-        .album-card:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-            transform: translateY(-4px);
-        }
-    </style>
+    <link rel = "stylesheet" href = "artist.css">
 </head>
 
 <body class="font-sans bg-gray-900 text-white m-0 p-0 has-player">
@@ -442,72 +420,6 @@ function formatDate($dateString)
     <!-- Include the player scripts -->
     <script src="player.js"></script>
     <script src="playerState.js"></script>
-    
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Mobile menu
-            const menuButton = document.getElementById('mobile-menu-button');
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('mobile-overlay');
-            
-            menuButton.addEventListener('click', function() {
-                sidebar.classList.toggle('open');
-                overlay.classList.toggle('open');
-            });
-            
-            overlay.addEventListener('click', function() {
-                sidebar.classList.remove('open');
-                overlay.classList.remove('open');
-            });
-            
-            // Play all button
-            const playAllBtn = document.getElementById('play-all');
-            if (playAllBtn) {
-                playAllBtn.addEventListener('click', function() {
-                    const firstSongRow = document.querySelector('.song-row');
-                    if (firstSongRow) {
-                        firstSongRow.click();
-                    }
-                });
-            }
-            
-            // Like/Unlike functionality
-            const likeButtons = document.querySelectorAll('.like-button');
-            likeButtons.forEach(button => {
-                button.addEventListener('click', function(e) {
-                    e.stopPropagation(); // Prevent row click
-                    const songId = this.dataset.songId;
-                    const heartIcon = this.querySelector('i');
-                    const isLiked = heartIcon.classList.contains('fas');
-                    
-                    // Determine action based on current state
-                    const action = isLiked ? 'unlike' : 'like';
-                    
-                    // AJAX request to like/unlike the song
-                    fetch('like_song.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: 'song_id=' + songId + '&action=' + action
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            // Update heart icon
-                            if (action === 'like') {
-                                heartIcon.classList.replace('far', 'fas');
-                                heartIcon.classList.add('text-green-500');
-                            } else {
-                                heartIcon.classList.replace('fas', 'far');
-                                heartIcon.classList.remove('text-green-500');
-                            }
-                        }
-                    })
-                    .catch(error => console.error('Error:', error));
-                });
-            });
-        });
-    </script>
+    <script src="artist.js"></script>
 </body>
 </html>

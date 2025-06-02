@@ -5,6 +5,12 @@ session_start();
 
 include 'sqlConnect.php';
 
+// Ensure playlist covers directory exists
+$playlistCoversDir = 'uploads/playlists/';
+if (!file_exists($playlistCoversDir)) {
+    mkdir($playlistCoversDir, 0777, true);
+}
+
 // Check if user is logged in
 $logged_in = isset($_SESSION['user_id']);
 
@@ -23,6 +29,7 @@ $playlist_sql = "SELECT
                 p.description,
                 p.is_public,
                 p.created_at,
+                p.cover_image,
                 u.username as creator
               FROM playlists p
               JOIN users u ON p.user_id = u.user_id
@@ -63,24 +70,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_playlist'])) {
             
             // Create directory if it doesn't exist
             if (!file_exists($targetDir)) {
-                mkdir($targetDir, 0777, true);
+                if (!mkdir($targetDir, 0777, true)) {
+                    $error_message = "Failed to create upload directory. Check folder permissions.";
+                }
             }
             
-            $imageFileName = uniqid() . "_" . basename($_FILES["cover_image"]["name"]);
-            $imageTargetFile = $targetDir . $imageFileName;
-            $imageFileType = strtolower(pathinfo($imageTargetFile, PATHINFO_EXTENSION));
-            
-            // Check if image file is an actual image
-            $check = getimagesize($_FILES["cover_image"]["tmp_name"]);
-            if ($check !== false) {
-                // Upload image
-                if (move_uploaded_file($_FILES["cover_image"]["tmp_name"], $imageTargetFile)) {
-                    $coverPath = $imageTargetFile;
+            // Only proceed if directory exists/was created
+            if (empty($error_message)) {
+                $imageFileName = uniqid() . "_" . basename($_FILES["cover_image"]["name"]);
+                $imageTargetFile = $targetDir . $imageFileName;
+                $imageFileType = strtolower(pathinfo($imageTargetFile, PATHINFO_EXTENSION));
+                
+                // Check if image file is an actual image
+                $check = @getimagesize($_FILES["cover_image"]["tmp_name"]);
+                if ($check !== false) {
+                    // Upload image
+                    if (move_uploaded_file($_FILES["cover_image"]["tmp_name"], $imageTargetFile)) {
+                        $coverPath = $imageTargetFile;
+                    } else {
+                        $error_message = "Sorry, there was an error uploading your image. Error code: " . $_FILES["cover_image"]["error"] . 
+                                         ". Make sure the uploads directory is writable.";
+                    }
                 } else {
-                    $error_message = "Sorry, there was an error uploading your image.";
+                    $error_message = "File is not a valid image.";
                 }
-            } else {
-                $error_message = "File is not an image.";
             }
         }
         
@@ -318,8 +331,16 @@ function formatDate($dateString) {
             <!-- Playlist Header -->
             <div class="flex flex-col md:flex-row items-end mb-10">
                 <!-- Playlist Icon -->
-                <div class="w-40 h-40 md:w-56 md:h-56 flex-shrink-0 mb-4 md:mb-0 md:mr-6 shadow-lg bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
-                    <i class="fas fa-music text-5xl text-gray-600"></i>
+                <div class="w-40 h-40 md:w-56 md:h-56 flex-shrink-0 mb-4 md:mb-0 md:mr-6 shadow-lg overflow-hidden">
+                    <?php if (!empty($playlist['cover_image']) && file_exists($playlist['cover_image'])): ?>
+                        <img src="<?= htmlspecialchars($playlist['cover_image']) ?>" 
+                            alt="<?= htmlspecialchars($playlist['name']) ?>" 
+                            class="w-full h-full object-cover">
+                    <?php else: ?>
+                        <div class="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+                            <i class="fas fa-music text-5xl text-gray-600"></i>
+                        </div>
+                    <?php endif; ?>
                 </div>
                 
                 <!-- Playlist Info -->
@@ -512,7 +533,7 @@ function formatDate($dateString) {
                     </button>
                 </div>
                 
-                <form method="POST" enctype="multipart/form-data">
+                <form method="POST" enctype="multipart/form-data" id="edit-playlist-form">
                     <div class="mb-4">
                         <label for="playlist_name" class="block mb-2 font-semibold text-gray-400">Playlist Name *</label>
                         <input type="text" id="playlist_name" name="playlist_name" value="<?= htmlspecialchars($playlist['name']) ?>" 
@@ -646,6 +667,23 @@ function formatDate($dateString) {
 
             if (editCoverInput) {
                 editCoverInput.addEventListener('change', function() {
+                    // Validate file size (5MB limit)
+                    if (this.files[0] && this.files[0].size > 5 * 1024 * 1024) {
+                        alert('File is too large. Please select an image under 5MB.');
+                        this.value = ''; // Clear the input
+                        editFileNameDisplay.textContent = 'Current image';
+                        return;
+                    }
+                    
+                    // Check file type
+                    if (this.files[0] && !this.files[0].type.match('image.*')) {
+                        alert('Please select a valid image file (JPEG, PNG, GIF, etc.)');
+                        this.value = '';
+                        editFileNameDisplay.textContent = 'Current image';
+                        return;
+                    }
+                    
+                    // If all is well, show the preview
                     if (this.files && this.files[0]) {
                         const reader = new FileReader();
                         

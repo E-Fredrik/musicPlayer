@@ -65,71 +65,139 @@ function getAudioDuration($filePath)
 
 // Process form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // Get form data
-    $title = mysqli_real_escape_string($conn, $_POST['title']);
-   
-    $album_option = $_POST['album_option'];
-
-    // Process song file upload first to get duration
-    $targetDir = "uploads/songs/";
-    $duration = isset($_POST['detected_duration']) && is_numeric($_POST['detected_duration']) ? 
-        (int)$_POST['detected_duration'] : 0;
-    $songTargetFile = "";
-
-    // Create directory if it doesn't exist
-    if (!file_exists($targetDir)) {
-        mkdir($targetDir, 0777, true);
-    }
-
-    // Check if a song file was uploaded
-    if (isset($_FILES["song_file"]) && $_FILES["song_file"]["error"] == 0) {
-        // Generate a unique filename
-        $songFileName = uniqid() . "_" . basename($_FILES["song_file"]["name"]);
-        $songTargetFile = $targetDir . $songFileName;
-        $songFileType = strtolower(pathinfo($songTargetFile, PATHINFO_EXTENSION));
-
-        // Check if file is an actual audio file
-        $allowedExtensions = array("mp3", "wav", "ogg", "flac");
-        if (!in_array($songFileType, $allowedExtensions)) {
-            $error = "Sorry, only MP3, WAV, OGG, and FLAC files are allowed.";
-        } else {
-            // Upload file
-            if (move_uploaded_file($_FILES["song_file"]["tmp_name"], $songTargetFile)) {
-                // Use client-side detected duration if available, otherwise try server detection
-                if (isset($_POST['detected_duration']) && is_numeric($_POST['detected_duration']) && (int)$_POST['detected_duration'] > 0) {
-                    $duration = (int)$_POST['detected_duration'];
-                } else {
-                    // Only fall back to server-side detection if client-side failed
-                    $duration = getAudioDuration($songTargetFile);
+    // Check if this is a delete request first
+    if (isset($_POST['delete_song']) && isset($_POST['delete_song_id'])) {
+        // Handle song deletion
+        $song_id = (int)$_POST['delete_song_id'];
+        
+        // Check if song belongs to current user
+        $check_query = "SELECT * FROM songs WHERE song_id = $song_id AND uploaded_by = " . $_SESSION['user_id'];
+        $check_result = mysqli_query($conn, $check_query);
+        
+        if (mysqli_num_rows($check_result) > 0) {
+            $song_data = mysqli_fetch_assoc($check_result);
+            
+            mysqli_begin_transaction($conn);
+            
+            try {
+                // Remove song from all playlists
+                mysqli_query($conn, "DELETE FROM playlist_songs WHERE song_id = $song_id");
+                
+                // Remove song from liked songs
+                mysqli_query($conn, "DELETE FROM liked_songs WHERE song_id = $song_id");
+                
+                // Remove song artist relationships
+                mysqli_query($conn, "DELETE FROM song_artists WHERE song_id = $song_id");
+                
+                // Delete the song itself
+                mysqli_query($conn, "DELETE FROM songs WHERE song_id = $song_id");
+                
+                // Commit transaction
+                mysqli_commit($conn);
+                
+                // Delete the actual file
+                if (!empty($song_data['file_path']) && file_exists($song_data['file_path'])) {
+                    unlink($song_data['file_path']);
                 }
+                
+                // Delete cover art if it's not the default and it exists
+                if (!empty($song_data['cover_art']) && $song_data['cover_art'] != 'uploads/covers/default_cover.jpg' && file_exists($song_data['cover_art'])) {
+                    unlink($song_data['cover_art']);
+                }
+                
+                $message = "Song deleted successfully!";
+            } catch (Exception $e) {
+                mysqli_rollback($conn);
+                $error = "Failed to delete song: " . $e->getMessage();
+            }
+        } else {
+            $error = "You don't have permission to delete this song.";
+        }
+    } 
+    else {
+        // This is a song upload request
+        // Get form data (only if they exist)
+        $title = isset($_POST['title']) ? mysqli_real_escape_string($conn, $_POST['title']) : '';
+        $artist_option = isset($_POST['artist_option']) ? $_POST['artist_option'] : '';
+        $album_option = isset($_POST['album_option']) ? $_POST['album_option'] : '';
 
-                // Process cover image if uploaded
-                $coverPath = NULL;
-                if (isset($_FILES["cover_art"]) && $_FILES["cover_art"]["error"] == 0) {
-                    $coverDir = "uploads/covers/";
+        // Process song file upload first to get duration
+        $targetDir = "uploads/songs/";
+        $duration = isset($_POST['detected_duration']) && is_numeric($_POST['detected_duration']) ? 
+            (int)$_POST['detected_duration'] : 0;
+        $songTargetFile = "";
 
-                    // Create directory if it doesn't exist
-                    if (!file_exists($coverDir)) {
-                        mkdir($coverDir, 0777, true);
+        // Create directory if it doesn't exist
+        if (!file_exists($targetDir)) {
+            mkdir($targetDir, 0777, true);
+        }
+
+        // Check if a song file was uploaded
+        if (isset($_FILES["song_file"]) && $_FILES["song_file"]["error"] == 0) {
+            // Generate a unique filename
+            $songFileName = uniqid() . "_" . basename($_FILES["song_file"]["name"]);
+            $songTargetFile = $targetDir . $songFileName;
+            $songFileType = strtolower(pathinfo($songTargetFile, PATHINFO_EXTENSION));
+
+            // Check if file is an actual audio file
+            $allowedExtensions = array("mp3", "wav", "ogg", "flac");
+            if (!in_array($songFileType, $allowedExtensions)) {
+                $error = "Sorry, only MP3, WAV, OGG, and FLAC files are allowed.";
+            } else {
+                // Upload file
+                if (move_uploaded_file($_FILES["song_file"]["tmp_name"], $songTargetFile)) {
+                    // Use client-side detected duration if available, otherwise try server detection
+                    if (isset($_POST['detected_duration']) && is_numeric($_POST['detected_duration']) && (int)$_POST['detected_duration'] > 0) {
+                        $duration = (int)$_POST['detected_duration'];
+                    } else {
+                        // Only fall back to server-side detection if client-side failed
+                        $duration = getAudioDuration($songTargetFile);
                     }
 
-                    $coverFileName = uniqid() . "_" . basename($_FILES["cover_art"]["name"]);
-                    $coverTargetFile = $coverDir . $coverFileName;
-                    $coverFileType = strtolower(pathinfo($coverTargetFile, PATHINFO_EXTENSION));
+                    // Process cover image if uploaded
+                    $coverPath = NULL;
+                    if (isset($_FILES["cover_art"]) && $_FILES["cover_art"]["error"] == 0) {
+                        $coverDir = "uploads/covers/";
 
-                    // Check if image file is an actual image
-                    $check = getimagesize($_FILES["cover_art"]["tmp_name"]);
-                    if ($check !== false) {
-                        // Upload image
-                        if (move_uploaded_file($_FILES["cover_art"]["tmp_name"], $coverTargetFile)) {
-                            $coverPath = $coverTargetFile;
+                        // Create directory if it doesn't exist
+                        if (!file_exists($coverDir)) {
+                            mkdir($coverDir, 0777, true);
+                        }
+
+                        $coverFileName = uniqid() . "_" . basename($_FILES["cover_art"]["name"]);
+                        $coverTargetFile = $coverDir . $coverFileName;
+                        $coverFileType = strtolower(pathinfo($coverTargetFile, PATHINFO_EXTENSION));
+
+                        // Check if image file is an actual image
+                        $check = getimagesize($_FILES["cover_art"]["tmp_name"]);
+                        if ($check !== false) {
+                            // Upload image
+                            if (move_uploaded_file($_FILES["cover_art"]["tmp_name"], $coverTargetFile)) {
+                                $coverPath = $coverTargetFile;
+                            } else {
+                                $error = "Sorry, there was an error uploading your cover image.";
+                            }
                         } else {
-                            $error = "Sorry, there was an error uploading your cover image.";
+                            $error = "File is not an image.";
                         }
                     } else {
-                        $error = "File is not an image.";
+                        // No song cover uploaded, try to use album cover instead
+                        if ($album_option == 'existing' && isset($_POST['album_id']) && !empty($_POST['album_id'])) {
+                            // Fetch the existing album's cover
+                            $album_id = (int)$_POST['album_id'];
+                            $album_cover_query = "SELECT cover_art FROM albums WHERE album_id = $album_id";
+                            $album_cover_result = mysqli_query($conn, $album_cover_query);
+                            if ($album_cover_result && mysqli_num_rows($album_cover_result) > 0) {
+                                $album_data = mysqli_fetch_assoc($album_cover_result);
+                                if (!empty($album_data['cover_art'])) {
+                                    $coverPath = $album_data['cover_art'];
+                                }
+                            }
+                        }
                     }
+                    // For new album, we'll set coverPath after processing the album cover
                 }
+                
 
                 // If no errors, continue processing
                 if (empty($error)) {
@@ -262,8 +330,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         $release_date = isset($_POST['release_date']) ? mysqli_real_escape_string($conn, $_POST['release_date']) : NULL;
 
                         // Prepare statement to prevent SQL injection
-                        $sql = "INSERT INTO songs (title, duration, file_path, cover_art, album_id, release_date) 
-                                VALUES (?, ?, ?, ?, ?, ?)";
+                        $sql = "INSERT INTO songs (title, duration, file_path, cover_art, album_id, release_date, uploaded_by, created_at) 
+                                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
 
                         // Use prepared statements instead
                         $stmt = mysqli_prepare($conn, $sql);
@@ -281,13 +349,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         if ($release_date_param === NULL) $release_date_param = '';
 
                         // Bind parameters - now all are properly initialized variables
-                        mysqli_stmt_bind_param($stmt, "sissss",  // Changed the last 'i' to 's' to accept empty values
+                        mysqli_stmt_bind_param($stmt, "sissssi",  // Add one more 'i' for the user_id integer
                             $title, 
                             $duration, 
                             $songTargetFile, 
                             $cover_path_param, 
                             $album_id_param, 
-                            $release_date_param
+                            $release_date_param,
+                            $_SESSION['user_id']  // Add the current user's ID
                         );
 
                         // After execution, put the NULL values back in MySQL with a direct SQL UPDATE if needed
@@ -358,18 +427,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         } else {
                             $error = "Error: " . mysqli_error($conn);
                         }
-
+                        
                         // Close the prepared statement
                         mysqli_stmt_close($stmt);
                     }
                 }
-            } else {
-                $error = "Sorry, there was an error uploading your song file.";
-            }
+            } 
         } 
-    } else {
-            $error = "Please select a song file to upload.";
-    }
+    } 
 }
 
 // Get existing artists
@@ -714,6 +779,116 @@ function formatTime($seconds)
                     <button type="submit" class="py-3 px-6 bg-green-500 text-white border-none rounded-full text-base font-bold cursor-pointer hover:bg-green-400 transition-colors">Upload Song</button>
                 </form>
             </div>
+
+            <!-- My Uploaded Songs Section -->
+            <div class="mt-10 bg-black bg-opacity-20 rounded-lg p-6">
+    <h2 class="text-xl font-bold mb-4">My Uploaded Songs</h2>
+    
+    <?php
+    // Get songs uploaded by current user
+    $my_songs_query = "SELECT 
+                        s.song_id,
+                        s.title,
+                        s.file_path,
+                        s.cover_art,
+                        s.duration,
+                        GROUP_CONCAT(a.name SEPARATOR ', ') as artists,
+                        al.title as album_title
+                    FROM songs s
+                    LEFT JOIN song_artists sa ON s.song_id = sa.song_id
+                    LEFT JOIN artists a ON sa.artist_id = a.artist_id
+                    LEFT JOIN albums al ON s.album_id = al.album_id
+                    WHERE s.uploaded_by = " . $_SESSION['user_id'] . "
+                    GROUP BY s.song_id
+                    ORDER BY s.created_at DESC";
+    
+    $my_songs_result = mysqli_query($conn, $my_songs_query);
+    $my_songs = [];
+    
+    if ($my_songs_result && mysqli_num_rows($my_songs_result) > 0) {
+        while ($row = mysqli_fetch_assoc($my_songs_result)) {
+            $my_songs[] = $row;
+        }
+    }
+    ?>
+    
+    <?php if (count($my_songs) > 0): ?>
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse">
+                <thead>
+                    <tr>
+                        <th class="text-left py-3 px-2 border-b border-gray-700 text-gray-400 font-normal text-sm">#</th>
+                        <th class="text-left py-3 px-2 border-b border-gray-700 text-gray-400 font-normal text-sm">Title</th>
+                        <th class="text-left py-3 px-2 border-b border-gray-700 text-gray-400 font-normal text-sm">Artists</th>
+                        <th class="text-left py-3 px-2 border-b border-gray-700 text-gray-400 font-normal text-sm">Album</th>
+                        <th class="text-right py-3 px-2 border-b border-gray-700 text-gray-400 font-normal text-sm">Duration</th>
+                        <th class="text-right py-3 px-2 border-b border-gray-700 text-gray-400 font-normal text-sm">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($my_songs as $index => $song): ?>
+                        <tr class="song-row hover:bg-white hover:bg-opacity-10 border-b border-gray-700"
+                           data-song-id="<?= $song['song_id'] ?>"
+                           data-file="<?= htmlspecialchars($song['file_path']) ?>"
+                           data-album-cover="<?= !empty($song['cover_art']) ? htmlspecialchars($song['cover_art']) : 'uploads/covers/default_cover.jpg' ?>">
+                            <td class="py-3 px-2 w-12">
+                                <div class="flex items-center">
+                                    <button class="play-button bg-transparent border-0 text-white cursor-pointer text-sm mr-3 w-4 flex items-center justify-center">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                    <span class="text-gray-400"><?= $index + 1 ?></span>
+                                </div>
+                            </td>
+                            <td class="py-3 px-2">
+                                <div class="flex items-center">
+                                    <div class="w-10 h-10 mr-4 flex-shrink-0">
+                                        <img src="<?= !empty($song['cover_art']) ? $song['cover_art'] : 'uploads/covers/default_cover.jpg' ?>" 
+                                            alt="Cover" class="w-full h-full object-cover">
+                                    </div>
+                                    <div class="song-title-artist">
+                                        <div class="text-white font-medium song-title"><?= htmlspecialchars($song['title']) ?></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-3 px-2 song-artist"><?= htmlspecialchars($song['artists']) ?></td>
+                            <td class="py-3 px-2 text-gray-400"><?= !empty($song['album_title']) ? htmlspecialchars($song['album_title']) : '-' ?></td>
+                            <td class="py-3 px-2 text-right text-gray-400 text-sm"><?= formatTime($song['duration']) ?></td>
+                            <td class="py-3 px-2 text-right">
+                                <button class="delete-song-btn text-red-400 hover:text-red-300 transition-colors" data-song-id="<?= $song['song_id'] ?>">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php else: ?>
+        <div class="text-center py-8 text-gray-400">
+            You haven't uploaded any songs yet.
+        </div>
+    <?php endif; ?>
+</div>
+
+<!-- Delete Song Modal -->
+<div id="delete-song-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+    <div class="bg-gray-800 p-8 rounded-lg max-w-md w-full">
+        <h3 class="text-xl font-bold mb-4">Delete Song</h3>
+        <p class="text-gray-300 mb-6">Are you sure you want to delete this song? This will remove it from all playlists and it cannot be recovered.</p>
+        
+        <form method="POST" id="delete-song-form">
+            <input type="hidden" name="delete_song_id" id="delete-song-id" value="">
+            <div class="flex justify-end space-x-4">
+                <button type="button" id="cancel-delete-song" class="py-2 px-4 bg-gray-600 hover:bg-gray-500 text-white rounded transition-colors">
+                    Cancel
+                </button>
+                <button type="submit" name="delete_song" value="1" class="py-2 px-4 bg-red-600 hover:bg-red-500 text-white rounded transition-colors">
+                    Delete Song
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
         </div>
 
         <!-- Player Bar - Fixed for proper centering -->
@@ -998,6 +1173,37 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+</script>
+
+<script>
+// Delete Song functionality
+const deleteSongBtns = document.querySelectorAll('.delete-song-btn');
+const deleteSongModal = document.getElementById('delete-song-modal');
+const deleteSongIdInput = document.getElementById('delete-song-id');
+const cancelDeleteSongBtn = document.getElementById('cancel-delete-song');
+
+deleteSongBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+        const songId = this.getAttribute('data-song-id');
+        deleteSongIdInput.value = songId;
+        deleteSongModal.classList.remove('hidden');
+    });
+});
+
+if (cancelDeleteSongBtn) {
+    cancelDeleteSongBtn.addEventListener('click', function() {
+        deleteSongModal.classList.add('hidden');
+    });
+}
+
+// Close when clicking outside modal
+if (deleteSongModal) {
+    deleteSongModal.addEventListener('click', function(e) {
+        if (e.target === deleteSongModal) {
+            deleteSongModal.classList.add('hidden');
+        }
+    });
+}
 </script>
 </body>
 

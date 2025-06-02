@@ -138,6 +138,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
+
+    // Delete Account
+    if (isset($_POST['delete_account'])) {
+        $confirm_password = $_POST['confirm_password_delete'];
+        
+        // Get current password hash
+        $pass_query = "SELECT password FROM users WHERE user_id = $user_id";
+        $pass_result = mysqli_query($conn, $pass_query);
+        $pass_data = mysqli_fetch_assoc($pass_result);
+        
+        if (!password_verify($confirm_password, $pass_data['password'])) {
+            $error = "Incorrect password. Account deletion cancelled.";
+        } else {
+            // Begin transaction for safe deletion
+            mysqli_begin_transaction($conn);
+            
+            try {
+                // Delete user's playlists and playlist songs
+                $playlists_query = "SELECT playlist_id FROM playlists WHERE user_id = $user_id";
+                $playlists_result = mysqli_query($conn, $playlists_query);
+                
+                if ($playlists_result) {
+                    while ($playlist = mysqli_fetch_assoc($playlists_result)) {
+                        $playlist_id = $playlist['playlist_id'];
+                        // Delete playlist songs
+                        mysqli_query($conn, "DELETE FROM playlist_songs WHERE playlist_id = $playlist_id");
+                    }
+                }
+                
+                // Delete playlists
+                mysqli_query($conn, "DELETE FROM playlists WHERE user_id = $user_id");
+                
+                // Delete liked songs
+                mysqli_query($conn, "DELETE FROM liked_songs WHERE user_id = $user_id");
+                
+                // Delete user account
+                mysqli_query($conn, "DELETE FROM users WHERE user_id = $user_id");
+                
+                // Commit transaction if all queries successful
+                mysqli_commit($conn);
+                
+                // Delete profile picture file if exists and not the default
+                if (!empty($user['profile_picture']) && $user['profile_picture'] != 'uploads/profiles/default_profile.jpg') {
+                    if (file_exists($user['profile_picture'])) {
+                        unlink($user['profile_picture']);
+                    }
+                }
+                
+                // Destroy session
+                session_destroy();
+                
+                // Redirect to login page
+                header('Location: login.php?deleted=1');
+                exit();
+                
+            } catch (Exception $e) {
+                // Rollback transaction on error
+                mysqli_rollback($conn);
+                $error = "Failed to delete account: " . $e->getMessage();
+            }
+        }
+    }
 }
 
 // Get default profile picture if none exists
@@ -344,6 +406,16 @@ $profile_picture = !empty($user['profile_picture']) ? $user['profile_picture'] :
                         </button>
                     </form>
                 </div>
+
+                <!-- Danger Zone Section -->
+                <div class="bg-black bg-opacity-30 p-6 rounded-lg md:col-span-2 mt-8">
+                    <h3 class="text-xl mb-4 text-red-400">Danger Zone</h3>
+                    <p class="text-gray-400 mb-4">Permanently delete your account and all your data. This action cannot be undone.</p>
+                    
+                    <button id="show-delete-modal" class="py-2 px-6 bg-red-600 hover:bg-red-500 text-white font-medium rounded-full transition-colors">
+                        Delete Account
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -408,6 +480,31 @@ $profile_picture = !empty($user['profile_picture']) ? $user['profile_picture'] :
     <!-- Audio Element -->
     <audio id="audio-player"></audio>
 
+    <!-- Delete Account Modal -->
+    <div id="delete-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 p-8 rounded-lg max-w-md w-full">
+            <h3 class="text-xl font-bold mb-4">Delete Your Account</h3>
+            <p class="text-gray-300 mb-6">This will permanently delete your account, playlists, uploads, and all associated data. This action cannot be undone.</p>
+            
+            <form method="POST" id="delete-account-form">
+                <div class="mb-4">
+                    <label for="confirm_password_delete" class="block mb-2 text-gray-400">Enter your password to confirm</label>
+                    <input type="password" id="confirm_password_delete" name="confirm_password_delete" 
+                        class="w-full p-3 bg-gray-700 border-none rounded text-white focus:outline-none focus:bg-gray-600" required>
+                </div>
+                
+                <div class="flex justify-end space-x-4">
+                    <button type="button" id="cancel-delete" class="py-2 px-4 bg-gray-600 hover:bg-gray-500 text-white rounded transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" name="delete_account" value="1" class="py-2 px-4 bg-red-600 hover:bg-red-500 text-white rounded transition-colors">
+                        Delete Account Permanently
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="player.js"></script>
     <script src="playerState.js"></script>
@@ -448,6 +545,28 @@ $profile_picture = !empty($user['profile_picture']) ? $user['profile_picture'] :
                 sidebar.classList.remove('open');
                 overlay.classList.remove('open');
             });
+
+            // Delete account modal
+            const deleteAccountBtn = document.getElementById('show-delete-modal');
+            const deleteModal = document.getElementById('delete-modal');
+            const cancelDeleteBtn = document.getElementById('cancel-delete');
+            
+            if (deleteAccountBtn && deleteModal) {
+                deleteAccountBtn.addEventListener('click', function() {
+                    deleteModal.classList.remove('hidden');
+                });
+                
+                cancelDeleteBtn.addEventListener('click', function() {
+                    deleteModal.classList.add('hidden');
+                });
+                
+                // Close when clicking outside modal
+                deleteModal.addEventListener('click', function(e) {
+                    if (e.target === deleteModal) {
+                        deleteModal.classList.add('hidden');
+                    }
+                });
+            }
         });
     </script>
 </body>

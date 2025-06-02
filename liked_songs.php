@@ -81,7 +81,7 @@ function formatDate($dateString) {
                 padding-top: 3.5rem !important;
             }
         }
-        .liked-song-row:hover .unlike-btn {
+        .liked-song-hover:hover .unlike-btn {
             opacity: 1;
         }
         .unlike-btn {
@@ -210,7 +210,7 @@ function formatDate($dateString) {
                         </thead>
                         <tbody>
                             <?php foreach($songs as $index => $song): ?>
-                                <tr class="liked-song-row hover:bg-white hover:bg-opacity-10 border-b border-gray-700" 
+                                <tr class="song-row liked-song-hover hover:bg-white hover:bg-opacity-10 border-b border-gray-700"
                                     data-song-id="<?= $song['song_id'] ?>" 
                                     data-file="<?= htmlspecialchars($song['file_path']) ?>"
                                     data-album-cover="<?= !empty($song['cover_art']) ? htmlspecialchars($song['cover_art']) : 'uploads/covers/default_cover.jpg' ?>">
@@ -252,6 +252,14 @@ function formatDate($dateString) {
                                                 data-song-id="<?= $song['song_id'] ?>">
                                             <i class="fas fa-heart"></i>
                                         </button>
+                                    </td>
+                                    <!-- Add to Playlist dropdown button -->
+                                    <td class="py-3 px-2 text-right">
+                                        <div class="relative inline-block">
+                                            <button class="text-gray-400 hover:text-white add-to-playlist-btn" data-song-id="<?= $song['song_id'] ?>">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -331,6 +339,39 @@ function formatDate($dateString) {
     <!-- Audio Element -->
     <audio id="audio-player"></audio>
 
+    <!-- Add to Playlist Modal -->
+    <div id="add-to-playlist-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 p-6 rounded-lg max-w-md w-full">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Add to Playlist</h3>
+                <button id="close-playlist-modal" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div id="playlist-list" class="max-h-80 overflow-y-auto mb-4">
+                <?php
+                // Get user's playlists
+                $user_playlists_query = "SELECT playlist_id, name FROM playlists WHERE user_id = " . $_SESSION['user_id'] . " ORDER BY created_at DESC";
+                $user_playlists_result = mysqli_query($conn, $user_playlists_query);
+                
+                if ($user_playlists_result && mysqli_num_rows($user_playlists_result) > 0) {
+                    while ($playlist = mysqli_fetch_assoc($user_playlists_result)) {
+                        echo '<div class="playlist-item p-3 hover:bg-gray-700 rounded cursor-pointer mb-1" data-playlist-id="' . $playlist['playlist_id'] . '">';
+                        echo '<div class="flex items-center">';
+                        echo '<i class="fas fa-music mr-3 text-gray-400"></i>';
+                        echo '<span>' . htmlspecialchars($playlist['name']) . '</span>';
+                        echo '</div></div>';
+                    }
+                } else {
+                    echo '<p class="text-center text-gray-400 py-4">You don\'t have any playlists yet.</p>';
+                    echo '<a href="addPlaylist.php" class="block text-center text-green-500 hover:underline">Create a playlist</a>';
+                }
+                ?>
+            </div>
+        </div>
+    </div>
+
     <!-- Include the player scripts -->
     <script src="player.js"></script>
     <script src="playerState.js"></script>
@@ -378,7 +419,7 @@ function formatDate($dateString) {
                                 songRow.remove();
                                 
                                 // Update song count
-                                const songCount = document.querySelectorAll('.liked-song-row').length;
+                                const songCount = document.querySelectorAll('.song-row.liked-song-hover').length;
                                 document.querySelector('.text-sm.text-gray-400 span:last-child').textContent = songCount + ' songs';
                                 
                                 // Show empty state if no songs left
@@ -401,6 +442,67 @@ function formatDate($dateString) {
                         }
                     })
                     .catch(error => console.error('Error:', error));
+                });
+            });
+
+            // Add to Playlist functionality
+            let currentSongId = null;
+            const addToPlaylistBtns = document.querySelectorAll('.add-to-playlist-btn');
+            const addToPlaylistModal = document.getElementById('add-to-playlist-modal');
+            const closePlaylistModalBtn = document.getElementById('close-playlist-modal');
+            const playlistItems = document.querySelectorAll('.playlist-item');
+            
+            addToPlaylistBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    currentSongId = this.getAttribute('data-song-id');
+                    addToPlaylistModal.classList.remove('hidden');
+                });
+            });
+            
+            if (closePlaylistModalBtn) {
+                closePlaylistModalBtn.addEventListener('click', function() {
+                    addToPlaylistModal.classList.add('hidden');
+                });
+            }
+            
+            // Close when clicking outside modal
+            if (addToPlaylistModal) {
+                addToPlaylistModal.addEventListener('click', function(e) {
+                    if (e.target === addToPlaylistModal) {
+                        addToPlaylistModal.classList.add('hidden');
+                    }
+                });
+            }
+            
+            // Handle playlist selection
+            playlistItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    const playlistId = this.getAttribute('data-playlist-id');
+                    
+                    if (currentSongId) {
+                        // Add song to selected playlist
+                        fetch('add_to_playlist.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                            },
+                            body: `song_id=${currentSongId}&playlist_id=${playlistId}`
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                // Show success message
+                                alert('Song added to playlist successfully!');
+                                addToPlaylistModal.classList.add('hidden');
+                            } else {
+                                alert(data.message || 'Failed to add song to playlist');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('An error occurred when trying to add the song to the playlist');
+                        });
+                    }
                 });
             });
         });

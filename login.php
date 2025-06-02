@@ -77,6 +77,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         <?php endif; ?>
         
+        <?php if (isset($_GET['deleted']) && $_GET['deleted'] == 1): ?>
+            <div class="bg-green-500 bg-opacity-10 text-green-500 p-3 rounded mb-5 text-sm text-center">
+                Your account has been permanently deleted.
+            </div>
+        <?php endif; ?>
+        
         <form method="POST" action="login.php">
             <div class="mb-5">
                 <label for="username" class="block mb-2 text-gray-400 text-sm font-medium">Email or username</label>

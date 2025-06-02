@@ -61,7 +61,8 @@ if ($songs_result && mysqli_num_rows($songs_result) > 0) {
     }
 }
 
-function formatTime($seconds) {
+function formatTime($seconds)
+{
     return sprintf("%02d:%02d", floor($seconds / 60), $seconds % 60);
 }
 
@@ -71,6 +72,7 @@ $release_date = !empty($album['release_date']) ? date('F j, Y', strtotime($album
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -82,7 +84,8 @@ $release_date = !empty($album['release_date']) ? date('F j, Y', strtotime($album
         /* Additional styles to fix the mobile overlap */
         @media (max-width: 768px) {
             .content-area {
-                padding-top: 3.5rem !important; /* Ensure enough space for the hamburger menu */
+                padding-top: 3.5rem !important;
+                /* Ensure enough space for the hamburger menu */
             }
         }
     </style>
@@ -95,7 +98,7 @@ $release_date = !empty($album['release_date']) ? date('F j, Y', strtotime($album
             <i class="fas fa-bars"></i>
         </button>
     </div>
-    
+
     <!-- Mobile menu overlay -->
     <div id="mobile-overlay" class="mobile-menu-overlay"></div>
 
@@ -178,13 +181,12 @@ $release_date = !empty($album['release_date']) ? date('F j, Y', strtotime($album
             <div class="flex flex-col md:flex-row items-end mb-10">
                 <!-- Album Cover -->
                 <div class="w-40 h-40 md:w-56 md:h-56 flex-shrink-0 mb-4 md:mb-0 md:mr-6 shadow-lg">
-                    <img 
-                        src="<?= !empty($album['cover_art']) ? $album['cover_art'] : 'uploads/covers/default_cover.jpg' ?>" 
-                        alt="<?= htmlspecialchars($album['title']) ?>" 
-                        class="w-full h-full object-cover"
-                    >
+                    <img
+                        src="<?= !empty($album['cover_art']) ? $album['cover_art'] : 'uploads/covers/default_cover.jpg' ?>"
+                        alt="<?= htmlspecialchars($album['title']) ?>"
+                        class="w-full h-full object-cover">
                 </div>
-                
+
                 <!-- Album Info -->
                 <div class="flex-1">
                     <div class="text-xs font-bold uppercase mb-1 tracking-wide">Album</div>
@@ -198,17 +200,17 @@ $release_date = !empty($album['release_date']) ? date('F j, Y', strtotime($album
                     </div>
                 </div>
             </div>
-            
+
             <!-- Album Actions -->
             <div class="mb-6">
                 <button id="play-all" class="w-14 h-14 bg-green-500 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-105 transition duration-200 ease-in-out">
                     <i class="fas fa-play text-xl"></i>
                 </button>
             </div>
-            
+
             <!-- Songs List -->
             <div class="w-full">
-                <?php if(count($songs) > 0): ?>
+                <?php if (count($songs) > 0): ?>
                     <table class="w-full border-collapse">
                         <thead>
                             <tr>
@@ -218,8 +220,11 @@ $release_date = !empty($album['release_date']) ? date('F j, Y', strtotime($album
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach($songs as $index => $song): ?>
-                                <tr class="song-row hover:bg-white hover:bg-opacity-10 border-b border-gray-700" data-song-id="<?= $song['song_id'] ?>" data-file="<?= htmlspecialchars($song['file_path']) ?>">
+                            <?php foreach ($songs as $index => $song): ?>
+                                <tr class="song-row hover:bg-white hover:bg-opacity-10 border-b border-gray-700"
+                                    data-song-id="<?= $song['song_id'] ?>"
+                                    data-file="<?= htmlspecialchars($song['file_path']) ?>"
+                                    data-album-cover="<?= !empty($album['cover_art']) ? htmlspecialchars($album['cover_art']) : 'uploads/covers/default_cover.jpg' ?>">
                                     <td class="py-3 px-2 w-12">
                                         <div class="flex items-center">
                                             <button class="play-button bg-transparent border-0 text-white cursor-pointer text-sm mr-3 w-4 flex items-center justify-center">
@@ -230,8 +235,8 @@ $release_date = !empty($album['release_date']) ? date('F j, Y', strtotime($album
                                     </td>
                                     <td class="py-3 px-2">
                                         <div class="song-title-artist">
-                                            <div class="text-white font-medium"><?= htmlspecialchars($song['song_title']) ?></div>
-                                            <div class="text-gray-400 text-sm"><?= htmlspecialchars($song['artist_name']) ?></div>
+                                            <div class="text-white font-medium song-title"><?= htmlspecialchars($song['song_title']) ?></div>
+                                            <div class="text-gray-400 text-sm song-artist"><?= htmlspecialchars($song['artist_name']) ?></div>
                                         </div>
                                     </td>
                                     <td class="py-3 px-2 text-right text-gray-400 text-sm"><?= formatTime($song['duration']) ?></td>
@@ -309,27 +314,27 @@ $release_date = !empty($album['release_date']) ? date('F j, Y', strtotime($album
     <!-- Include the player scripts -->
     <script src="player.js"></script>
     <script src="playerState.js"></script>
-    
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Add album cover data to all song rows
             const songRows = document.querySelectorAll('.song-row');
             const albumCover = '<?= !empty($album['cover_art']) ? $album['cover_art'] : 'uploads/covers/default_cover.jpg' ?>';
-            
+
             songRows.forEach(row => {
                 row.dataset.albumCover = albumCover;
             });
-            
+
             // Mobile menu script
             const menuButton = document.getElementById('mobile-menu-button');
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('mobile-overlay');
-            
+
             menuButton.addEventListener('click', function() {
                 sidebar.classList.toggle('open');
                 overlay.classList.toggle('open');
             });
-            
+
             overlay.addEventListener('click', function() {
                 sidebar.classList.remove('open');
                 overlay.classList.remove('open');
@@ -337,4 +342,5 @@ $release_date = !empty($album['release_date']) ? date('F j, Y', strtotime($album
         });
     </script>
 </body>
+
 </html>

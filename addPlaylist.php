@@ -136,53 +136,7 @@ function formatTime($seconds)
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="home.css">
-    <style>
-        /* Additional styles to fix the mobile overlap */
-        @media (max-width: 768px) {
-            .content-area {
-                padding-top: 3.5rem !important; /* Ensure enough space for the hamburger menu */
-            }
-        }
-        /* Custom checkbox styling */
-        .song-checkbox:checked + div {
-            background-color: rgba(29, 185, 84, 0.1);
-            border-color: #1db954;
-        }
-        /* Playlist cover preview */
-        .playlist-cover-preview {
-            width: 180px;
-            height: 180px;
-            background-color: #333;
-            margin-bottom: 20px;
-            border-radius: 4px;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-        }
-        .playlist-cover-preview img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        .playlist-cover-preview .overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-            opacity: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: opacity 0.2s ease;
-        }
-        .playlist-cover-preview:hover .overlay {
-            opacity: 1;
-        }
-    </style>
+    <link rel = "stylesheet" href = "addplaylist.css">
 </head>
 
 <body class="font-sans bg-gray-900 text-white m-0 p-0 has-player">
@@ -419,83 +373,6 @@ function formatTime($seconds)
     <!-- Include the player scripts -->
     <script src="player.js"></script>
     <script src="playerState.js"></script>
-    
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Select all songs functionality
-            const selectAllCheckbox = document.getElementById('select-all-songs');
-            const songCheckboxes = document.querySelectorAll('.song-checkbox');
-            
-            selectAllCheckbox.addEventListener('change', function() {
-                songCheckboxes.forEach(checkbox => {
-                    checkbox.checked = this.checked;
-                    updateCheckboxStyle(checkbox);
-                });
-            });
-            
-            // Individual song selection
-            songCheckboxes.forEach(checkbox => {
-                checkbox.addEventListener('change', function() {
-                    updateCheckboxStyle(this);
-                    
-                    // Update "select all" checkbox state
-                    let allChecked = true;
-                    songCheckboxes.forEach(cb => {
-                        if (!cb.checked) allChecked = false;
-                    });
-                    selectAllCheckbox.checked = allChecked;
-                });
-                
-                // Initial styling
-                updateCheckboxStyle(checkbox);
-            });
-            
-            function updateCheckboxStyle(checkbox) {
-                const checkIcon = checkbox.parentNode.querySelector('.song-check-icon');
-                if (checkbox.checked) {
-                    checkIcon.classList.remove('text-transparent');
-                    checkIcon.classList.add('text-green-500');
-                } else {
-                    checkIcon.classList.add('text-transparent');
-                    checkIcon.classList.remove('text-green-500');
-                }
-            }
-            
-            // Mobile menu
-            const menuButton = document.getElementById('mobile-menu-button');
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('mobile-overlay');
-            
-            menuButton.addEventListener('click', function() {
-                sidebar.classList.toggle('open');
-                overlay.classList.toggle('open');
-            });
-            
-            overlay.addEventListener('click', function() {
-                sidebar.classList.remove('open');
-                overlay.classList.remove('open');
-            });
-            
-            // Cover image upload preview
-            const coverImageInput = document.getElementById('cover_image');
-            const coverPreview = document.getElementById('cover-preview');
-            const uploadCoverButton = document.getElementById('upload-cover-button');
-            
-            uploadCoverButton.addEventListener('click', function() {
-                coverImageInput.click();
-            });
-            
-            coverImageInput.addEventListener('change', function() {
-                const file = this.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        coverPreview.src = e.target.result;
-                    }
-                    reader.readAsDataURL(file);
-                }
-            });
-        });
-    </script>
+    <script src="addPlaylist.js"></script>
 </body>
 </html>
