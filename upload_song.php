@@ -114,6 +114,77 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $error = "You don't have permission to delete this song.";
         }
     } 
+    // Handle song editing
+    else if (isset($_POST['edit_song']) && isset($_POST['edit_song_id'])) {
+        // Handle song edit
+        $song_id = (int)$_POST['edit_song_id'];
+        $song_title = mysqli_real_escape_string($conn, $_POST['edit_song_title']);
+        
+        // Check if song belongs to current user
+        $check_query = "SELECT * FROM songs WHERE song_id = $song_id AND uploaded_by = " . $_SESSION['user_id'];
+        $check_result = mysqli_query($conn, $check_query);
+        
+        if (mysqli_num_rows($check_result) > 0) {
+            $song_data = mysqli_fetch_assoc($check_result);
+            $updateFields = [];
+            
+            // Always update title
+            $updateFields[] = "title = '$song_title'";
+            
+            // Process cover image if uploaded
+            if (isset($_FILES["edit_cover_art"]) && $_FILES["edit_cover_art"]["error"] == 0) {
+                $coverDir = "uploads/covers/";
+                
+                // Create directory if it doesn't exist
+                if (!file_exists($coverDir)) {
+                    mkdir($coverDir, 0777, true);
+                }
+                
+                $coverFileName = uniqid() . "_" . basename($_FILES["edit_cover_art"]["name"]);
+                $coverTargetFile = $coverDir . $coverFileName;
+                $coverFileType = strtolower(pathinfo($coverTargetFile, PATHINFO_EXTENSION));
+                
+                // Check if image file is an actual image
+                $check = getimagesize($_FILES["edit_cover_art"]["tmp_name"]);
+                if ($check !== false) {
+                    // Upload image
+                    if (move_uploaded_file($_FILES["edit_cover_art"]["tmp_name"], $coverTargetFile)) {
+                        // Add cover_art to update fields
+                        $updateFields[] = "cover_art = '$coverTargetFile'";
+                        
+                        // Delete old cover if it's not the default and not used by other songs
+                        if (!empty($song_data['cover_art']) && $song_data['cover_art'] != 'uploads/covers/default_cover.jpg') {
+                            // Check if other songs use the same cover
+                            $cover_check_query = "SELECT COUNT(*) as count FROM songs WHERE cover_art = '{$song_data['cover_art']}' AND song_id != $song_id";
+                            $cover_check_result = mysqli_query($conn, $cover_check_query);
+                            $cover_check_data = mysqli_fetch_assoc($cover_check_result);
+                            
+                            if ($cover_check_data['count'] == 0 && file_exists($song_data['cover_art'])) {
+                                unlink($song_data['cover_art']);
+                            }
+                        }
+                    } else {
+                        $error = "Sorry, there was an error uploading your cover image.";
+                    }
+                } else {
+                    $error = "File is not an image.";
+                }
+            }
+            
+            // Update the song in the database
+            if (!empty($updateFields) && empty($error)) {
+                $update_sql = "UPDATE songs SET " . implode(", ", $updateFields) . " WHERE song_id = $song_id";
+                
+                if (mysqli_query($conn, $update_sql)) {
+                    $message = "Song updated successfully!";
+                } else {
+                    $error = "Error updating song: " . mysqli_error($conn);
+                }
+            }
+        } else {
+            $error = "You don't have permission to edit this song.";
+        }
+    } 
     else {
         // This is a song upload request
         // Get form data (only if they exist)
@@ -854,6 +925,9 @@ function formatTime($seconds)
                             <td class="py-3 px-2 text-gray-400"><?= !empty($song['album_title']) ? htmlspecialchars($song['album_title']) : '-' ?></td>
                             <td class="py-3 px-2 text-right text-gray-400 text-sm"><?= formatTime($song['duration']) ?></td>
                             <td class="py-3 px-2 text-right">
+                                <button class="edit-song-btn text-blue-400 hover:text-blue-300 transition-colors mr-3" data-song-id="<?= $song['song_id'] ?>" data-song-title="<?= htmlspecialchars($song['title']) ?>">
+                                    <i class="fas fa-edit"></i>
+                                </button>
                                 <button class="delete-song-btn text-red-400 hover:text-red-300 transition-colors" data-song-id="<?= $song['song_id'] ?>">
                                     <i class="fas fa-trash"></i>
                                 </button>
@@ -884,6 +958,55 @@ function formatTime($seconds)
                 </button>
                 <button type="submit" name="delete_song" value="1" class="py-2 px-4 bg-red-600 hover:bg-red-500 text-white rounded transition-colors">
                     Delete Song
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Song Modal -->
+<div id="edit-song-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+    <div class="bg-gray-800 p-8 rounded-lg max-w-md w-full">
+        <h3 class="text-xl font-bold mb-4">Edit Song</h3>
+        <p class="text-gray-300 mb-6">Update song details</p>
+        
+        <form method="POST" enctype="multipart/form-data" id="edit-song-form">
+            <input type="hidden" name="edit_song_id" id="edit-song-id" value="">
+            
+            <div class="mb-5">
+                <label for="edit_song_title" class="block mb-2 font-semibold text-gray-400">Song Title</label>
+                <input type="text" id="edit_song_title" name="edit_song_title" class="w-full p-3 bg-gray-700 border-none rounded text-white text-base focus:outline-none focus:bg-gray-600">
+            </div>
+            
+            <div class="mb-5">
+                <label class="block mb-2 font-semibold text-gray-400">Current Cover</label>
+                <div class="w-full flex items-center justify-center mb-4">
+                    <div class="w-40 h-40 overflow-hidden">
+                        <img id="edit-cover-preview" src="uploads/covers/default_cover.jpg" alt="Cover" class="w-full h-full object-cover">
+                    </div>
+                </div>
+                
+                <label for="edit_cover_art" class="block mb-2 font-semibold text-gray-400">Change Cover Image</label>
+                <div class="relative">
+                    <input type="file" id="edit_cover_art" name="edit_cover_art" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer">
+                    <div class="flex items-center">
+                        <button type="button" class="py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-l-md border-0 font-medium focus:outline-none transition-colors">
+                            Choose File
+                        </button>
+                        <div id="edit_cover_art_name" class="py-2 px-4 bg-gray-800 rounded-r-md flex-grow text-gray-400 truncate">
+                            No file selected
+                        </div>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">Recommended size: 300x300 pixels</p>
+            </div>
+            
+            <div class="flex justify-end space-x-4">
+                <button type="button" id="cancel-edit-song" class="py-2 px-4 bg-gray-600 hover:bg-gray-500 text-white rounded transition-colors">
+                    Cancel
+                </button>
+                <button type="submit" name="edit_song" value="1" class="py-2 px-4 bg-green-600 hover:bg-green-500 text-white rounded transition-colors">
+                    Save Changes
                 </button>
             </div>
         </form>
@@ -1201,6 +1324,69 @@ if (deleteSongModal) {
     deleteSongModal.addEventListener('click', function(e) {
         if (e.target === deleteSongModal) {
             deleteSongModal.classList.add('hidden');
+        }
+    });
+}
+</script>
+
+<script>
+// Edit Song functionality
+const editSongBtns = document.querySelectorAll('.edit-song-btn');
+const editSongModal = document.getElementById('edit-song-modal');
+const editSongIdInput = document.getElementById('edit-song-id');
+const editSongTitleInput = document.getElementById('edit_song_title');
+const editCoverPreview = document.getElementById('edit-cover-preview');
+const cancelEditSongBtn = document.getElementById('cancel-edit-song');
+const editCoverInput = document.getElementById('edit_cover_art');
+const editCoverNameDisplay = document.getElementById('edit_cover_art_name');
+
+editSongBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+        const songId = this.getAttribute('data-song-id');
+        const songTitle = this.getAttribute('data-song-title');
+        const songRow = document.querySelector(`tr[data-song-id="${songId}"]`);
+        const coverUrl = songRow.getAttribute('data-album-cover');
+        
+        // Set form values
+        editSongIdInput.value = songId;
+        editSongTitleInput.value = songTitle;
+        editCoverPreview.src = coverUrl;
+        
+        // Show modal
+        editSongModal.classList.remove('hidden');
+    });
+});
+
+if (cancelEditSongBtn) {
+    cancelEditSongBtn.addEventListener('click', function() {
+        editSongModal.classList.add('hidden');
+    });
+}
+
+// Close when clicking outside modal
+if (editSongModal) {
+    editSongModal.addEventListener('click', function(e) {
+        if (e.target === editSongModal) {
+            editSongModal.classList.add('hidden');
+        }
+    });
+}
+
+// Handle file selection for edit cover
+if (editCoverInput) {
+    editCoverInput.addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+            // Update file name display
+            editCoverNameDisplay.textContent = this.files[0].name;
+            
+            // Show preview of new image
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                editCoverPreview.src = e.target.result;
+            };
+            reader.readAsDataURL(this.files[0]);
+        } else {
+            editCoverNameDisplay.textContent = 'No file selected';
         }
     });
 }
