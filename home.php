@@ -4,28 +4,28 @@ session_start();
 
 include 'sqlConnect.php';
 
-// Check if user is logged in
+
 $logged_in = isset($_SESSION['user_id']);
 
-// Fetch songs with artist and album information
-$sql = "SELECT 
+
+$songs_sql = "SELECT 
             s.song_id, 
             s.title AS song_title, 
             s.file_path, 
             s.cover_art, 
             s.duration,
             a.name AS artist_name,
+            a.artist_id, 
             al.title AS album_title,
             al.album_id
-        FROM songs s
-        LEFT JOIN song_artists sa ON s.song_id = sa.song_id
-        LEFT JOIN artists a ON sa.artist_id = a.artist_id
-        LEFT JOIN albums al ON s.album_id = al.album_id
-        WHERE sa.is_primary = 1 OR sa.is_primary IS NULL
-        ORDER BY s.song_id DESC
-        LIMIT 20";
+          FROM songs s
+          LEFT JOIN song_artists sa ON s.song_id = sa.song_id
+          LEFT JOIN artists a ON sa.artist_id = a.artist_id
+          LEFT JOIN albums al ON s.album_id = al.album_id
+          WHERE sa.is_primary = 1 OR sa.is_primary IS NULL
+          ORDER BY s.title"; 
 
-$result = mysqli_query($conn, $sql);
+$result = mysqli_query($conn, $songs_sql);
 $songs = [];
 
 if ($result && mysqli_num_rows($result) > 0) {
@@ -61,6 +61,9 @@ if ($logged_in) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MusicStream - Your Music Streaming Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="home.css">
@@ -199,7 +202,15 @@ if ($logged_in) {
                                             </div>
                                             <div class="flex flex-col">
                                                 <div class="song-title text-white text-sm md:text-base truncate max-w-[150px] md:max-w-none"><?= htmlspecialchars($song['song_title']) ?></div>
-                                                <div class="song-artist text-xs md:text-sm text-gray-400 truncate max-w-[150px] md:max-w-none"><?= htmlspecialchars($song['artist_name']) ?></div>
+                                                <div class="song-artist text-xs md:text-sm text-gray-400 truncate max-w-[150px] md:max-w-none">
+                                                    <?php if (!empty($song['artist_id'])): ?>
+                                                        <a href="artist.php?id=<?= $song['artist_id'] ?>" class="text-gray-400 hover:text-green-500 hover:underline no-underline">
+                                                            <?= htmlspecialchars($song['artist_name']) ?>
+                                                        </a>
+                                                    <?php else: ?>
+                                                        <?= htmlspecialchars($song['artist_name']) ?>
+                                                    <?php endif; ?>
+                                                </div>
                                             </div>
                                         </div>
                                     </td>
@@ -256,7 +267,7 @@ if ($logged_in) {
             <div class="flex flex-col items-center w-full md:w-1/2">
                 <!-- Control buttons with increased spacing -->
                 <div class="flex items-center justify-center w-full mb-2">
-                    <button class="bg-transparent border-0 text-gray-400 cursor-pointer text-base mx-3 hidden md:block">
+                    <button id="shuffle-button" class="bg-transparent border-0 text-gray-400 cursor-pointer text-base mx-3 hidden md:block">
                         <i class="fas fa-random"></i>
                     </button>
                     <button id="prev-button" class="bg-transparent border-0 text-gray-400 cursor-pointer text-lg mx-4">
@@ -268,7 +279,7 @@ if ($logged_in) {
                     <button id="next-button" class="bg-transparent border-0 text-gray-400 cursor-pointer text-lg mx-4">
                         <i class="fas fa-step-forward"></i>
                     </button>
-                    <button class="bg-transparent border-0 text-gray-400 cursor-pointer text-base mx-3 hidden md:block">
+                    <button id="loop-button" class="bg-transparent border-0 text-gray-400 cursor-pointer text-base mx-3 hidden md:block">
                         <i class="fas fa-repeat"></i>
                     </button>
                 </div>

@@ -342,7 +342,7 @@ function formatTime($seconds)
                         <h3 class="text-xl font-bold mb-4">Artists</h3>
                         <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                             <?php foreach ($artists as $artist): ?>
-                                <div class="bg-gray-800 bg-opacity-40 p-3 rounded hover:bg-opacity-60 transition-all transform hover:scale-105">
+                                <a href="artist.php?id=<?= $artist['artist_id'] ?>" class="bg-gray-800 bg-opacity-40 p-3 rounded hover:bg-opacity-60 transition-all transform hover:scale-105 no-underline">
                                     <div class="w-full aspect-square rounded-full overflow-hidden mb-3">
                                         <img 
                                             src="<?= !empty($artist['image']) ? $artist['image'] : 'uploads/artists/default_artist.jpg' ?>" 
@@ -352,7 +352,7 @@ function formatTime($seconds)
                                     </div>
                                     <div class="text-white font-medium truncate text-center"><?= htmlspecialchars($artist['name']) ?></div>
                                     <div class="text-gray-400 text-sm truncate text-center">Artist</div>
-                                </div>
+                                </a>
                             <?php endforeach; ?>
                         </div>
                     </section>

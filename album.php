@@ -262,7 +262,8 @@ $release_date = !empty($album['release_date']) ? date('F j, Y', strtotime($album
             <div class="flex flex-col items-center w-full md:w-1/2">
                 <!-- Control buttons with increased spacing -->
                 <div class="flex items-center justify-center w-full mb-2">
-                    <button class="bg-transparent border-0 text-gray-400 cursor-pointer text-base mx-3 hidden md:block">
+                    <!-- Shuffle button -->
+                    <button id="shuffle-button" class="bg-transparent border-0 text-gray-400 cursor-pointer text-base mx-3 hidden md:block">
                         <i class="fas fa-random"></i>
                     </button>
                     <button id="prev-button" class="bg-transparent border-0 text-gray-400 cursor-pointer text-lg mx-4">
@@ -274,7 +275,8 @@ $release_date = !empty($album['release_date']) ? date('F j, Y', strtotime($album
                     <button id="next-button" class="bg-transparent border-0 text-gray-400 cursor-pointer text-lg mx-4">
                         <i class="fas fa-step-forward"></i>
                     </button>
-                    <button class="bg-transparent border-0 text-gray-400 cursor-pointer text-base mx-3 hidden md:block">
+                    <!-- Loop button -->
+                    <button id="loop-button" class="bg-transparent border-0 text-gray-400 cursor-pointer text-base mx-3 hidden md:block">
                         <i class="fas fa-repeat"></i>
                     </button>
                 </div>

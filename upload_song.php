@@ -67,7 +67,7 @@ function getAudioDuration($filePath)
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Get form data
     $title = mysqli_real_escape_string($conn, $_POST['title']);
-    $artist_option = $_POST['artist_option'];
+   
     $album_option = $_POST['album_option'];
 
     // Process song file upload first to get duration
@@ -745,7 +745,7 @@ function formatTime($seconds)
                     <button id="next-button" class="bg-transparent border-0 text-gray-400 cursor-pointer text-lg mx-4">
                         <i class="fas fa-step-forward"></i>
                     </button>
-                    <button class="bg-transparent border-0 text-gray-400 cursor-pointer text-base mx-3 hidden md:block">
+                    <button id="loop-button" class="bg-transparent border-0 text-gray-400 cursor-pointer text-base mx-3 hidden md:block">
                         <i class="fas fa-repeat"></i>
                     </button>
                 </div>
